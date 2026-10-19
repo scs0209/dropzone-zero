@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+
+# Generated demo folders
+demo/
+
+# Local state (journal, quarantine) never leaves the machine
+.dropzone/
+
+.DS_Store
+*.log
+
+# pnpm store created when the global one is not writable
+.pnpm-store/
