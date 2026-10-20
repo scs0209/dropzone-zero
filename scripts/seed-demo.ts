@@ -1,8 +1,9 @@
-// Builds a messy, Downloads-style demo folder with 30 synthetic files.
+// Builds a messy, Downloads-style demo folder with 31 synthetic files.
 // Every name, company, and amount is fictional. Usage: pnpm seed [folder]
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rm, utimes, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { mkdir, readFile, readdir, rm, utimes, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { crc32, deflateSync } from "node:zlib";
 
 const MARKER = ".dropzone-demo";
@@ -64,6 +65,8 @@ const receiptCoffee = pdf(["Bluebird Coffee", "Receipt #8D72F1", "2026-10-14 08:
 const receiptHardware = pdf(["Northwind Hardware", "Receipt 2026-10-03", "Cordless drill  89.00", "Drill bits (set)  14.99", "Total  USD 103.99"]);
 const manualAc = pdf(["AC-X200 Split Air Conditioner", "Owner's Manual", "Cleaning the filter: every 2 weeks", "Error code E4: check drain hose", "Warranty: 2 years from purchase"]);
 const photo2034 = png(64, 48, [94, 140, 186]);
+// A phone photo of a paper receipt, rendered by scripts/make-receipt-photo.py.
+const receiptPhoto = await readFile(join(dirname(fileURLToPath(import.meta.url)), "assets", "receipt-photo.jpg"));
 
 interface DemoFile {
   name: string;
@@ -86,6 +89,7 @@ const files: DemoFile[] = [
   { name: "IMG_2034.png", content: photo2034, ageDays: 20 },
   { name: "IMG_2035.png", content: png(64, 48, [214, 168, 82]), ageDays: 20 },
   { name: "IMG_2036.png", content: png(64, 48, [96, 160, 104]), ageDays: 20 },
+  { name: "IMG_2041.jpg", content: receiptPhoto, ageDays: 9 },
   { name: "Screenshot 2026-10-12 at 09.41.22.png", content: png(120, 80, [236, 236, 240]), ageDays: 8 },
   { name: "photo.png", content: png(48, 48, [180, 120, 160]), ageDays: 15 },
   // Manuals and warranties

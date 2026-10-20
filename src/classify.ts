@@ -39,7 +39,8 @@ export interface ClassifyResult extends Classification {
 
 /** Anything that turns a prompt into raw model output. Ollama in production, a stub in tests. */
 export interface ModelClient {
-  generate(prompt: string): Promise<string>;
+  /** `images` are base64-encoded files for multimodal models. */
+  generate(prompt: string, images?: string[]): Promise<string>;
 }
 
 /**
@@ -53,10 +54,11 @@ export const CLASSIFICATION_SCHEMA = {
     category: { type: "string", enum: CATEGORIES },
     date: { type: ["string", "null"] },
     title: { type: "string" },
+    visibleText: { type: "string" },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     reason: { type: "string" },
   },
-  required: ["category", "date", "title", "confidence", "reason"],
+  required: ["category", "date", "title", "visibleText", "confidence", "reason"],
 } as const;
 
 const CATEGORY_GUIDE: Record<Category, string> = {
@@ -94,7 +96,9 @@ const FOLDERS: Record<Category, { base: string; monthly: boolean }> = {
 export function buildPrompt(file: ScannedFile, content: ExtractedContent): string {
   const body = content.text
     ? `Content${content.truncated ? " (truncated)" : ""}:\n"""\n${content.text}\n"""`
-    : `Content: not available (${content.kind} file). Classify from the name and size, with confidence 0.6 or lower, and build the title from the file name, keeping identifiers such as IMG_2034.`;
+    : content.image
+      ? `Content: the image is attached. Look at it. If it shows a document (receipt, ticket, invoice, screen), classify the document, not the picture. If it has no readable text, build the title from the file name, keeping identifiers such as IMG_2034, plus a word or two about what it shows.`
+      : `Content: not available (${content.kind} file). Classify from the name and size, with confidence 0.6 or lower, and build the title from the file name, keeping identifiers such as IMG_2034.`;
   const guide = CATEGORIES.map((c) => `- ${c}: ${CATEGORY_GUIDE[c]}`).join("\n");
   return `You sort files in a Downloads folder. Read one file and describe it as JSON.
 
@@ -103,6 +107,7 @@ Reply with JSON only: {"category", "date", "title", "confidence", "reason"}.
 ${guide}
 - date: the main date written in the content or the file name (purchase, invoice, trip, or event date) as YYYY-MM-DD. Use null if no date is written there. Never use today's date or a guess.
 - title: 2 to 6 words naming the vendor or subject and the document type, using only words supported by this file. No date, no extension.
+- visibleText: when an image is attached, the most important text you can read in it (vendor, date, total), up to 300 characters. Otherwise "".
 - confidence: 0 to 1, how sure you are of the category.
 - reason: one short sentence.
 
@@ -132,9 +137,29 @@ export function normalizeDate(value: unknown, today = new Date()): string | null
   return year >= 1990 && year <= today.getUTCFullYear() + 2 ? value : null;
 }
 
-/** True when the date is literally written in the evidence, as 2026-10-14 or 20261014 (the .ics form). */
+const MONTH_NAMES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/**
+ * True when the date is written in the evidence in a common form: 2026-10-14,
+ * 20261014 (.ics), 2026/10/14, 2026.10.14, 10/14/2026, 14.10.2026, Oct 14, 2026,
+ * 14 October 2026, or 2026년 10월 14일.
+ */
 export function isDateWritten(date: string, evidence: string): boolean {
-  return evidence.includes(date) || evidence.includes(date.replaceAll("-", ""));
+  const [y, m, d] = date.split("-") as [string, string, string];
+  const mm = `0?${Number(m)}`;
+  const dd = `0?${Number(d)}`;
+  const month = `${MONTH_NAMES[Number(m) - 1]}[a-z]*\\.?`;
+  const patterns = [
+    `${y}-${m}-${d}`,
+    `${y}${m}${d}`,
+    `${y}[./]${mm}[./]${dd}`,
+    `${mm}[/.-]${dd}[/.-]${y}`,
+    `${dd}[/.-]${mm}[/.-]${y}`,
+    `${month} ${dd}(?:st|nd|rd|th)?,? ${y}`,
+    `${dd}(?:st|nd|rd|th)? ${month},? ${y}`,
+    `${y}\\s*년\\s*${mm}\\s*월\\s*${dd}\\s*일`,
+  ];
+  return patterns.some((pattern) => new RegExp(`(?<!\\d)${pattern}(?!\\d)`, "i").test(evidence));
 }
 
 /** Builds the final name and folder from what the model read. */
@@ -156,6 +181,8 @@ export function fileTarget(
  * Returns a clean Classification, or null when the output cannot be trusted.
  * `evidence` is the text the model saw (file name and content); a date that does
  * not appear in it is dropped, because small models fill gaps with plausible dates.
+ * For images, the model's own transcription (visibleText) counts as evidence: a
+ * weaker check, but it still stops dates that the model did not claim to read.
  */
 export function parseClassification(
   raw: string,
@@ -171,14 +198,15 @@ export function parseClassification(
     return null;
   }
   if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
-  const { category, date, title, confidence, reason } = data as Record<string, unknown>;
+  const { category, date, title, visibleText, confidence, reason } = data as Record<string, unknown>;
 
   if (typeof category !== "string" || !(CATEGORIES as readonly string[]).includes(category)) return null;
   if (typeof title !== "string" || typeof reason !== "string") return null;
   if (typeof confidence !== "number" || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) return null;
 
   const validDate = normalizeDate(date, today);
-  const cleanDate = validDate && isDateWritten(validDate, evidence) ? validDate : null;
+  const seen = typeof visibleText === "string" ? `${evidence}\n${visibleText}` : evidence;
+  const cleanDate = validDate && isDateWritten(validDate, seen) ? validDate : null;
   const target = fileTarget(category as Category, cleanDate, title, file);
   if (!target) return null;
 
@@ -215,7 +243,8 @@ export async function classifyFile(
   const evidence = `${file.name}\n${content.text}`;
   const maxAttempts = 2;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const parsed = parseClassification(await client.generate(prompt), file, evidence, today);
+    const raw = await client.generate(prompt, content.image ? [content.image] : undefined);
+    const parsed = parseClassification(raw, file, evidence, today);
     if (parsed) return { ...parsed, source: "model", attempts: attempt };
   }
   return fallbackClassification(file, maxAttempts);

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
-import { extractContent } from "./extract.js";
+import { contentKindOf, extractContent } from "./extract.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
@@ -13,9 +13,11 @@ const USAGE = `Dropzone Zero - keeps your Downloads folder tidy, with every move
 
 Usage:
   dz scan [folder] [--json]      List files with size, age, hash, and flags
-  dz preview [folder] [--json]   Plan new names and folders with a local model (read-only)
+  dz preview [folder] [--json | --summary]
+                                 Plan new names and folders with a local model (read-only)
 
 Options:
+  --summary                      Print only counts and timings, no file names
   -h, --help                     Show this help
 
 Environment:
@@ -66,7 +68,31 @@ function printPlan(plan: PlanItem[], folder: string): void {
   console.log(`\n${counts.move} to move, ${counts.quarantine} to quarantine, ${counts.skip} to skip.`);
 }
 
-async function preview(folder: string, json: boolean): Promise<void> {
+function countBy<T>(items: T[], key: (item: T) => string): string {
+  const counts = new Map<string, number>();
+  for (const item of items) counts.set(key(item), (counts.get(key(item)) ?? 0) + 1);
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, count]) => `${name} ${count}`)
+    .join(", ");
+}
+
+/** Aggregates only, so the output is safe to paste into an issue or a chat about a real folder. */
+function printSummary(plan: PlanItem[], seconds: number): void {
+  const counts = summarize(plan);
+  const modelCalls = plan.filter((item) => item.source !== "rule").length;
+  const band = (c: number) => (c < 0.5 ? "under 0.5" : c < 0.8 ? "0.5-0.8" : "0.8+");
+  console.log(`Plan summary for ${plan.length} files (names hidden, nothing was moved)\n`);
+  console.log(`Actions:     move ${counts.move}, quarantine ${counts.quarantine}, skip ${counts.skip}`);
+  console.log(`Categories:  ${countBy(plan.filter((i) => i.category), (i) => i.category!)}`);
+  console.log(`Decided by:  ${countBy(plan, (i) => i.source)}`);
+  console.log(`File types:  ${countBy(plan, (i) => contentKindOf(extname(i.name).toLowerCase()))}`);
+  console.log(`Confidence:  ${countBy(plan.filter((i) => i.source !== "rule"), (i) => band(i.confidence))}`);
+  console.log(`Skipped:     ${countBy(plan.filter((i) => i.action === "skip"), (i) => i.reason.split(":")[0]!.replace(/\.$/, ""))}`);
+  console.log(`Time:        ${seconds.toFixed(1)} s${modelCalls ? ` (${(seconds / modelCalls).toFixed(1)} s per model call)` : ""}`);
+}
+
+async function preview(folder: string, format: "table" | "json" | "summary"): Promise<void> {
   const files = await scanFolder(folder);
   const client = new OllamaClient();
   await client.ensureReady();
@@ -95,7 +121,8 @@ async function preview(folder: string, json: boolean): Promise<void> {
     fallback: plan.filter((item) => item.source === "fallback").length,
   });
 
-  if (json) process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
+  if (format === "json") process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
+  else if (format === "summary") printSummary(plan, (performance.now() - started) / 1000);
   else printPlan(plan, folder);
 }
 
@@ -128,6 +155,7 @@ async function main(): Promise<void> {
     options: {
       help: { type: "boolean", short: "h" },
       json: { type: "boolean" },
+      summary: { type: "boolean" },
     },
   });
   const [command, folderArg] = positionals;
@@ -141,7 +169,7 @@ async function main(): Promise<void> {
   const json = values.json ?? false;
 
   if (command === "scan") return scan(folder, json);
-  if (command === "preview") return preview(folder, json);
+  if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");
 
   process.stderr.write(`Unknown command: ${command}\n\n${USAGE}`);
   process.exitCode = 1;

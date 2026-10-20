@@ -42,7 +42,7 @@ export class OllamaClient implements ModelClient {
     }
   }
 
-  async generate(prompt: string): Promise<string> {
+  async generate(prompt: string, images?: string[]): Promise<string> {
     const response = await fetch(`${this.host}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -50,6 +50,7 @@ export class OllamaClient implements ModelClient {
       body: JSON.stringify({
         model: this.model,
         prompt,
+        ...(images?.length ? { images } : {}),
         stream: false,
         format: CLASSIFICATION_SCHEMA,
         // Gemma 4 thinks by default; for a one-file classification that costs ~15x the time for no gain.
