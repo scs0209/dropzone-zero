@@ -4,8 +4,18 @@ import { extname, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
-import { executePlan, lastUndoableRun, loadPlan, savePlan, undoRun } from "./execute.js";
+import {
+  executePlan,
+  lastUndoableRun,
+  loadPlan,
+  movableItems,
+  savePlan,
+  undoRun,
+  type RunResult,
+  type UndoResult,
+} from "./execute.js";
 import { contentKindOf, extractContent } from "./extract.js";
+import { newRunId } from "./journal.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
@@ -17,18 +27,23 @@ Usage:
   dz scan [folder] [--json]      List files with size, age, hash, and flags
   dz preview [folder] [--json | --summary]
                                  Plan new names and folders with a local model (moves nothing)
-  dz run [folder] [--yes]        Carry out the last preview, verifying every move
-  dz undo [folder] [--yes]       Put back everything the last run moved
+  dz run [folder] [--yes] [--temporal]
+                                 Carry out the last preview, verifying every move
+  dz undo [folder] [--yes] [--temporal]
+                                 Put back everything the last run moved
+  dz worker                      Run a Temporal worker that finishes interrupted runs
 
 Options:
   --summary                      Print only counts and timings, no file names
   -y, --yes                      Do not ask for confirmation
+  --temporal                     Run as a durable Temporal workflow (needs \`temporal server start-dev\`)
   -h, --help                     Show this help
 
 Environment:
   DZ_INBOX      Folder to organize (default ~/Downloads)
   OLLAMA_HOST   Ollama server (default http://127.0.0.1:11434)
   DZ_MODEL      Ollama model (default gemma4:e4b)
+  TEMPORAL_ADDRESS  Temporal server for --temporal (default 127.0.0.1:7233)
   SENTRY_DSN    Optional; sends only aggregate counts and timings
 `;
 
@@ -151,7 +166,26 @@ function printFailures(failed: { name: string; error: string }[]): void {
   for (const { name, error } of failed) console.log(`  failed  ${name}: ${error}`);
 }
 
-async function run(folder: string, yes: boolean): Promise<void> {
+/**
+ * Executes a workflow on a worker inside this process. Temporal keeps the workflow's
+ * progress, so if this process dies halfway, `dz worker` picks it up where it stopped.
+ */
+async function runWorkflow<R>(workflow: "runPlanWorkflow" | "undoRunWorkflow", workflowId: string, args: unknown[]): Promise<R> {
+  const { connectClient, createWorker, TASK_QUEUE, workflowUrl } = await import("./temporal/worker.js");
+  const client = await connectClient();
+  const worker = await createWorker();
+  console.log(`Temporal workflow ${workflowId}\n  ${workflowUrl(workflowId)}`);
+  return (await worker.runUntil(client.workflow.execute(workflow, { taskQueue: TASK_QUEUE, workflowId, args }))) as R;
+}
+
+async function startWorker(): Promise<void> {
+  const { createWorker, temporalAddress } = await import("./temporal/worker.js");
+  const worker = await createWorker();
+  console.log(`Worker connected to Temporal at ${temporalAddress()}. Press Ctrl+C to stop.`);
+  await worker.run();
+}
+
+async function run(folder: string, yes: boolean, temporal: boolean): Promise<void> {
   const plan = await loadPlan(folder);
   if (!plan || plan.inbox !== folder) {
     throw new Error(`No saved plan for ${folder}. Run \`dz preview\` first.`);
@@ -169,10 +203,18 @@ async function run(folder: string, yes: boolean): Promise<void> {
   }
 
   const started = performance.now();
+  const runId = newRunId();
   const result = await withSpan("dz.run", () =>
-    executePlan(folder, plan.items, (done, total) => {
-      if (process.stderr.isTTY) process.stderr.write(`\rMoving ${done}/${total}...`);
-    }),
+    temporal
+      ? runWorkflow<RunResult>("runPlanWorkflow", `dz-run-${runId}`, [folder, runId, movableItems(plan.items)])
+      : executePlan(
+          folder,
+          plan.items,
+          (done, total) => {
+            if (process.stderr.isTTY) process.stderr.write(`\rMoving ${done}/${total}...`);
+          },
+          runId,
+        ),
   );
   if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
   recordDuration("dz.run.duration", performance.now() - started);
@@ -183,7 +225,7 @@ async function run(folder: string, yes: boolean): Promise<void> {
   console.log("Changed your mind? `dz undo` puts everything back.");
 }
 
-async function undo(folder: string, yes: boolean): Promise<void> {
+async function undo(folder: string, yes: boolean, temporal: boolean): Promise<void> {
   const runId = await lastUndoableRun(folder);
   if (!runId) {
     console.log("Nothing to undo.");
@@ -193,7 +235,11 @@ async function undo(folder: string, yes: boolean): Promise<void> {
     console.log("Nothing was changed.");
     return;
   }
-  const result = await withSpan("dz.undo", () => undoRun(folder, runId));
+  const result = await withSpan("dz.undo", () =>
+    temporal
+      ? runWorkflow<UndoResult>("undoRunWorkflow", `dz-undo-${runId}`, [folder, runId])
+      : undoRun(folder, runId),
+  );
   recordCounts("dz.undo", { restored: result.restored, failed: result.failed.length });
   console.log(`Undid run ${runId}: restored ${result.restored} files.`);
   printFailures(result.failed);
@@ -230,6 +276,7 @@ async function main(): Promise<void> {
       json: { type: "boolean" },
       summary: { type: "boolean" },
       yes: { type: "boolean", short: "y" },
+      temporal: { type: "boolean" },
     },
   });
   const [command, folderArg] = positionals;
@@ -243,8 +290,9 @@ async function main(): Promise<void> {
   const json = values.json ?? false;
 
   if (command === "scan") return scan(folder, json);
-  if (command === "run") return run(folder, values.yes ?? false);
-  if (command === "undo") return undo(folder, values.yes ?? false);
+  if (command === "run") return run(folder, values.yes ?? false, values.temporal ?? false);
+  if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false);
+  if (command === "worker") return startWorker();
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");
 
   process.stderr.write(`Unknown command: ${command}\n\n${USAGE}`);
@@ -255,7 +303,9 @@ await initTelemetry();
 try {
   await main();
 } catch (error: unknown) {
-  if (!(error instanceof OllamaUnavailableError)) captureError(error);
+  // Setup problems (a server not running) are the user's to fix, not bugs to report.
+  const setupProblem = error instanceof OllamaUnavailableError || (error as Error)?.name === "TemporalUnavailableError";
+  if (!setupProblem) captureError(error);
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
 } finally {

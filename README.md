@@ -37,8 +37,9 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz preview [folder]` | Plans a new name and folder for every file with the local model and saves the plan. Nothing moves |
 | `dz run [folder]` | Carries out the saved plan after you confirm, verifying each file by hash before and after it moves |
 | `dz undo [folder]` | Reverses the most recent run: files go back to their old names and places, and folders the run created are removed if empty |
+| `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
 
-`scan` and `preview` take `--json` for machine-readable output; `run` and `undo` take `--yes` to skip the confirmation. `dz preview --summary` prints only counts and timings, with no file names, so you can share how it did on a real folder without sharing what is in it. The folder defaults to `DZ_INBOX`, then `~/Downloads`.
+`scan` and `preview` take `--json` for machine-readable output; `run` and `undo` take `--yes` to skip the confirmation, and `--temporal` to run as a durable workflow (below). `dz preview --summary` prints only counts and timings, with no file names, so you can share how it did on a real folder without sharing what is in it. The folder defaults to `DZ_INBOX`, then `~/Downloads`.
 
 Dropzone Zero keeps its state in a hidden `.dropzone` folder inside the folder it organizes: the saved plan, the journal (`journal.jsonl`), and `quarantine/`. Quarantine is never emptied for you.
 
@@ -48,6 +49,25 @@ Dropzone Zero keeps its state in a hidden `.dropzone` folder inside the folder i
 - A file is skipped, not moved, if it changed since the preview, if its target already exists, or if a target would leave the folder.
 - Every move is a rename inside the same folder tree: no copy, no delete, and the file is never in two places or none. The journal records each move as "started" before the rename and "done" after the new location is hashed, so even a run interrupted mid-move can be undone.
 - `dz undo` moves a file back only if it still has the hash it was moved with and its old place is free. If you edited a file after the run, undo leaves it where it is and tells you.
+
+## Durable runs with Temporal
+
+A few hundred renames finish in seconds, but a laptop can still sleep, crash, or lose power halfway. With `--temporal`, a run or an undo becomes a [Temporal](https://temporal.io) workflow: every file is one activity, and the Temporal server remembers which ones finished. If the process dies, `dz worker` continues with the next file instead of starting over.
+
+```bash
+brew install temporal
+temporal server start-dev          # local server, web UI at http://localhost:8233
+pnpm dz run demo/inbox --temporal
+```
+
+Each step is safe to repeat, which is what makes retries safe: a move whose file is already at its target with the right hash counts as done, and so does a restore whose file is already back. To see it work, slow the steps down, kill the run, and let a worker finish it:
+
+```bash
+DZ_STEP_DELAY_MS=300 pnpm dz run demo/inbox --yes --temporal   # press Ctrl+C after a few seconds
+pnpm dz worker                                                 # picks up the open workflow and finishes it
+```
+
+In testing, a run killed after 15 of 30 files was finished by `dz worker` with 30 moved and 0 failed, and `dz undo` then restored all 32 demo files byte for byte. Workflow history holds file names, targets, and hashes, so point `TEMPORAL_ADDRESS` only at a server you run yourself, such as the local dev server above.
 
 ## How a plan is made
 
@@ -73,7 +93,7 @@ Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves,
 - [x] Local classification with Gemma 4 through Ollama, and `dz preview`
 - [x] `dz run` with hash checks before and after every move, journaled
 - [x] `dz undo` from the journal
-- [ ] Run and undo as a durable [Temporal](https://temporal.io) workflow, so a crash or reboot resumes where it stopped
+- [x] Run and undo as a durable Temporal workflow, so a crash or reboot resumes where it stopped
 - [x] Gemma vision for photos and screenshots (Ollama's `images` field)
 - [ ] Vision for scanned PDFs that have no text layer (render the first page to an image)
 - [ ] [Mastra](https://mastra.ai) agent wrapper. Not added yet: today the classifier is one structured call per file with no tools, and Mastra's agent would need an extra AI SDK provider for Ollama to do the same thing. It becomes worthwhile once the agent has tools to call (journal lookups, receipt-to-CSV, calendar follow-ups).

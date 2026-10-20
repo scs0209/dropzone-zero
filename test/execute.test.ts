@@ -4,7 +4,16 @@ import { mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, it } from "node:test";
-import { executePlan, lastUndoableRun, loadPlan, savePlan, undoRun } from "../src/execute.js";
+import {
+  executePlan,
+  lastUndoableRun,
+  loadPlan,
+  moveOne,
+  movesToUndo,
+  restoreOne,
+  savePlan,
+  undoRun,
+} from "../src/execute.js";
 import { readJournal } from "../src/journal.js";
 import type { PlanItem } from "../src/plan.js";
 import { hashFile } from "../src/scan.js";
@@ -99,6 +108,37 @@ describe("executePlan", () => {
     assert.equal(undone.restored, 0);
     assert.equal(undone.failed[0]?.error, "File changed since it was moved");
     assert.equal(await readFile(join(inbox, "Docs/a.pdf"), "utf8"), "edited");
+  });
+});
+
+describe("retried steps", () => {
+  // Temporal retries an activity whose worker died mid-step, so every step must be safe to repeat.
+  it("a repeated move reports success instead of 'file is gone'", async () => {
+    const item = { ...(await file("a.pdf", "x")), target: "Docs/a.pdf" };
+    assert.deepEqual(await moveOne(inbox, "r1", item), { name: "a.pdf", ok: true });
+    assert.deepEqual(await moveOne(inbox, "r1", item), { name: "a.pdf", ok: true });
+    assert.equal(await readFile(join(inbox, "Docs/a.pdf"), "utf8"), "x");
+  });
+
+  it("a repeated restore reports success and leaves the file in place", async () => {
+    const item = { ...(await file("a.pdf", "x")), target: "Docs/a.pdf" };
+    await moveOne(inbox, "r1", item);
+    const [move] = await movesToUndo(inbox, "r1");
+    assert.ok(move);
+    assert.equal((await restoreOne(inbox, "r1", move)).ok, true);
+    assert.equal((await restoreOne(inbox, "r1", move)).ok, true);
+    assert.equal(await readFile(join(inbox, "a.pdf"), "utf8"), "x");
+  });
+
+  it("undoes a move that crashed after the rename but before the journal said done", async () => {
+    const item = { ...(await file("a.pdf", "x")), target: "Docs/a.pdf" };
+    await moveOne(inbox, "r1", item);
+    // Drop the "done" line to simulate a crash right after the rename.
+    const path = join(inbox, ".dropzone/journal.jsonl");
+    const lines = (await readFile(path, "utf8")).trim().split("\n").filter((l) => !l.includes('"state":"done"'));
+    await writeFile(path, lines.join("\n") + "\n");
+    assert.equal((await undoRun(inbox, "r1")).restored, 1);
+    assert.equal(await readFile(join(inbox, "a.pdf"), "utf8"), "x");
   });
 });
 
