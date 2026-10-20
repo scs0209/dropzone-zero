@@ -11,8 +11,8 @@ renderer.setClearColor(0x000000, 0);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
 // Framed tight: the robot, its antenna, and the waving arm fill the 128px stage.
-camera.position.set(0, 0.95, 6.1);
-camera.lookAt(0, 0.5, 0);
+camera.position.set(0, 0.95, 6.4);
+camera.lookAt(0, 0.42, 0);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6b7680, 1.7));
 const key = new THREE.DirectionalLight(0xffffff, 2.3);
@@ -63,7 +63,7 @@ robot.add(arm);
 const page = mesh(new RoundedBoxGeometry(0.4, 0.52, 0.04, 2, 0.02), clay(0xffffff));
 robot.add(page);
 
-const shadow = mesh(new THREE.CircleGeometry(1.25, 48), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.14 }), 0, -0.6, 0);
+const shadow = mesh(new THREE.CircleGeometry(1.0, 48), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.14 }), 0, -0.6, 0);
 shadow.rotation.x = -Math.PI / 2;
 scene.add(shadow);
 

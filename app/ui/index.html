@@ -11,9 +11,12 @@
       <div id="bubble-resize" title="Drag to resize the bubble" aria-hidden="true"></div>
       <div id="bubble-body">
         <p id="message">Connecting to Dropzone Zero...</p>
-        <ul id="pending"></ul>
-        <h2 id="recent-title" hidden>Recently filed</h2>
-        <ul id="recent"></ul>
+        <div id="lists">
+          <ul id="pending"></ul>
+          <h2 id="recent-title" hidden>Recently filed</h2>
+          <ul id="recent"></ul>
+          <p id="empty" hidden>Nothing filed yet. New downloads show up here.</p>
+        </div>
         <footer>
           <button id="undo" type="button" title="Put back everything the last run moved">Undo last</button>
           <button id="pause" type="button">Pause</button>

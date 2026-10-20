@@ -51,7 +51,8 @@ function render(state) {
     drawnPending = pendingKey;
     drawPending(state.pending);
   }
-  const recent = state.recent.filter((m) => m.current).slice(0, 5);
+  const recent = state.recent.filter((m) => m.current).slice(0, 8);
+  $("empty").hidden = recent.length > 0 || state.pending.length > 0;
   const recentKey = JSON.stringify(recent);
   if (recentKey !== drawnRecent) {
     drawnRecent = recentKey;
@@ -155,9 +156,12 @@ zee.addEventListener("click", () => {
 // does not cover other windows), Zee plus the bubble when it is open. Zee's
 // bottom-right corner is the anchor, so Zee never jumps when the bubble opens,
 // closes, or is resized.
-const ZEE_BOX = 152; // 128 px Zee plus margins
-const BUBBLE_ABOVE_ZEE = 146; // matches the bubble's bottom offset in style.css
-const BUBBLE_MIN = { w: 220, h: 120 };
+// Read Zee's size from style.css, so the window math and the layout cannot disagree.
+const ZEE_SIZE = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--zee-size")) || 100;
+const ZEE_BOX = ZEE_SIZE + 24; // Zee plus margins
+const BUBBLE_ABOVE_ZEE = ZEE_SIZE + 18; // the bubble's bottom offset in style.css
+// Small enough to stay out of the way, big enough that a question's buttons stay in view.
+const BUBBLE_MIN = { w: 240, h: 200 };
 const BUBBLE_MAX = { w: 640, h: 720 };
 const BUBBLE_KEY = "zee-bubble-size";
 const ANCHOR_KEY = "zee-anchor";
