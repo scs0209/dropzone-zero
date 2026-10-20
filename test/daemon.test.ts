@@ -113,3 +113,37 @@ describe("dz daemon API", () => {
     assert.ok(existsSync(join(inbox, "setup.pkg")));
   });
 });
+
+describe("dz daemon moods", () => {
+  it("looks busy while the model reads a new download", async (t) => {
+    if (!listening) return t.skip("cannot bind a port here");
+    const folder = await mkdtemp(join(tmpdir(), "dz-daemon-mood-"));
+    const infoPath = join(await mkdtemp(join(tmpdir(), "dz-daemon-info-")), "daemon.json");
+    let finishReading!: () => void;
+    const reading = new Promise<void>((resolve) => (finishReading = resolve));
+    const slow = new Daemon({
+      folder,
+      model: "test",
+      port: 0,
+      infoPath,
+      settleMs: 0,
+      debounceMs: 50,
+      waitForModel: async () => {},
+      classify: async (file) => {
+        await reading;
+        return classify(file);
+      },
+    });
+    await slow.start();
+    try {
+      await writeFile(join(folder, "receipt.pdf"), "coffee");
+      await until(async () => slow.state().mood === "thinking");
+      assert.equal(slow.state().message, "Reading receipt.pdf...");
+      finishReading();
+      await until(async () => slow.state().mood === "eating");
+    } finally {
+      finishReading();
+      await slow.stop();
+    }
+  });
+});

@@ -144,6 +144,7 @@ Not everyone wants a terminal open. Zee is a small 3D robot that sits in the cor
 | Zee | Means |
 |---|---|
 | Flat eyes, z z z | Watching; nothing to do |
+| Eyes scanning, blue light blinking | A new download is finishing, or Gemma is reading it ("Reading report.pdf...") |
 | Green light, a page flying into it | Just filed a download |
 | Waving, amber light, badge | Something needs your OK |
 | Orange eyes, wobbling | Cannot work (usually the local model is not running yet) |

@@ -67,7 +67,7 @@ const shadow = mesh(new THREE.CircleGeometry(1.0, 48), new THREE.MeshBasicMateri
 shadow.rotation.x = -Math.PI / 2;
 scene.add(shadow);
 
-// Moods, as set by zee.js: sleeping, eating, asking, dizzy, paused.
+// Moods, as set by zee.js: sleeping, thinking, eating, asking, dizzy, paused.
 let mood = document.body.className || "sleeping";
 const pointer = { x: 0, y: 0 };
 window.addEventListener("mousemove", (event) => {
@@ -112,7 +112,15 @@ function frame() {
   robot.rotation.y += ((resting ? Math.sin(t * 0.4) * 0.2 : pointer.x * 0.2) - robot.rotation.y) * 0.06;
 
   const blink = t % 3.4 < 0.12;
-  for (const eye of eyes) eye.scale.y = resting ? 0.12 : blink ? 0.1 : 1;
+  const thinking = mood === "thinking";
+  // Thinking: smaller eyes scanning the screen side to side, as if reading.
+  const scan = thinking ? Math.sin(t * 2.6) * 0.13 : 0;
+  eyes.forEach((eye, i) => {
+    eye.position.x = (i === 0 ? -0.28 : 0.28) + scan;
+    eye.scale.setScalar(thinking ? 0.78 : 1);
+    eye.scale.y = resting ? 0.12 : blink ? 0.1 : thinking ? 0.78 : 1;
+  });
+  if (thinking) head.rotation.z = Math.sin(t * 1.5) * 0.06;
   eyeMat.color.setHex(mood === "paused" ? 0x2b3640 : mood === "dizzy" ? 0xef9f27 : 0x5dcaa5);
   shellMat.color.setHex(mood === "paused" ? 0xa7b0b6 : 0xd7dee3);
 
@@ -130,7 +138,12 @@ function frame() {
     head.scale.y = 1;
   }
 
-  const glow = { asking: Math.sin(t * 5) > 0 ? 0xef9f27 : 0x6a3a08, eating: 0x1d9e75 }[mood] ?? 0x000000;
+  const glow =
+    {
+      asking: Math.sin(t * 5) > 0 ? 0xef9f27 : 0x6a3a08,
+      eating: 0x1d9e75,
+      thinking: Math.sin(t * 7) > 0 ? 0x378add : 0x0c447c,
+    }[mood] ?? 0x000000;
   bulbMat.emissive.setHex(glow);
 
   renderer.render(scene, camera);

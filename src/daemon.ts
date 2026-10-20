@@ -23,8 +23,12 @@ export function daemonInfoPath(): string {
   return join(homedir(), ".dropzone-zero", "daemon.json");
 }
 
-/** Sleeping, eating (just filed something), asking (needs a decision), dizzy (cannot work), or paused. */
-export type Mood = "sleeping" | "eating" | "asking" | "dizzy" | "paused";
+/**
+ * Sleeping (watching, nothing to do), thinking (a new download is finishing or
+ * being read by the model), eating (just filed something), asking (needs a
+ * decision), dizzy (cannot work), or paused.
+ */
+export type Mood = "sleeping" | "thinking" | "eating" | "asking" | "dizzy" | "paused";
 
 export interface PendingDecision {
   kind: "review" | "batch";
@@ -68,6 +72,11 @@ export class Daemon {
   private eatingUntil = 0;
   private dizzy: string | null = "Waiting for the local model (Ollama)...";
   private paused = false;
+  /** Files the model is reading right now, and the latest one, for the bubble. */
+  private reading = 0;
+  private readingName = "";
+  /** New files still being written (downloads in progress). */
+  private settling = 0;
   private pending: PendingDecision[] = [];
   private recent: RecentMove[] = [];
   private lastRun: DaemonState["lastRun"] = null;
@@ -76,22 +85,20 @@ export class Daemon {
   constructor(private readonly options: DaemonOptions) {}
 
   state(): DaemonState {
-    const mood: Mood = this.paused
-      ? "paused"
+    // Most important first: a question beats news, news beats being busy.
+    const [mood, message]: [Mood, string] = this.paused
+      ? ["paused", "Paused. New downloads stay where they land."]
       : this.dizzy
-        ? "dizzy"
+        ? ["dizzy", this.dizzy]
         : this.pending.length
-          ? "asking"
+          ? ["asking", `${this.pending.length} ${this.pending.length === 1 ? "thing needs" : "things need"} your OK.`]
           : Date.now() < this.eatingUntil
-            ? "eating"
-            : "sleeping";
-    const message = this.paused
-      ? "Paused. New downloads stay where they land."
-      : this.dizzy
-        ? this.dizzy
-        : this.pending.length
-          ? `${this.pending.length} ${this.pending.length === 1 ? "thing needs" : "things need"} your OK.`
-          : this.lastMessage;
+            ? ["eating", this.lastMessage]
+            : this.reading
+              ? ["thinking", `Reading ${this.readingName}...`]
+              : this.settling
+                ? ["thinking", `Waiting for ${this.settling === 1 ? "a download" : `${this.settling} downloads`} to finish...`]
+                : ["sleeping", this.lastMessage];
     return { folder: this.options.folder, mood, message, pending: this.pending, recent: this.recent, lastRun: this.lastRun };
   }
 
@@ -127,6 +134,16 @@ export class Daemon {
       ...this.options,
       inbox: this.options.folder,
       auto: true,
+      // Count what the model is reading, so Zee can look busy while it does.
+      classify: async (file) => {
+        this.reading++;
+        this.readingName = file.name;
+        try {
+          return await this.options.classify(file);
+        } finally {
+          this.reading--;
+        }
+      },
       onCycle: (result) => void this.onCycle(result),
       onError: (error) => {
         this.dizzy = `Something went wrong: ${error instanceof Error ? error.message : String(error)}`;
@@ -136,6 +153,7 @@ export class Daemon {
 
   private async onCycle(result: CycleResult): Promise<void> {
     this.dizzy = null;
+    this.settling = result.settling;
     if (result.run?.moved) {
       this.eatingUntil = Date.now() + 4_000;
       this.lastRun = { run: result.run.run, moved: result.run.moved };
