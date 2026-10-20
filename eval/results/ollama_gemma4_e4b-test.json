@@ -1,0 +1,1255 @@
+{
+  "model": "ollama:gemma4:e4b",
+  "split": "test",
+  "cases": 63,
+  "categoryAccuracy": 0.9841269841269841,
+  "dateAccuracy": 1,
+  "invalidRate": 0,
+  "latencyMs": {
+    "p50": 3572,
+    "p95": 4686
+  },
+  "byTag": {
+    "receipt": {
+      "cases": 13,
+      "categoryAccuracy": 0.9230769230769231
+    },
+    "korean": {
+      "cases": 9,
+      "categoryAccuracy": 1
+    },
+    "lookalike": {
+      "cases": 9,
+      "categoryAccuracy": 0.8888888888888888
+    },
+    "invoice": {
+      "cases": 8,
+      "categoryAccuracy": 1
+    },
+    "two-dates": {
+      "cases": 5,
+      "categoryAccuracy": 1
+    },
+    "statement": {
+      "cases": 4,
+      "categoryAccuracy": 1
+    },
+    "spreadsheet": {
+      "cases": 4,
+      "categoryAccuracy": 1
+    },
+    "booking": {
+      "cases": 6,
+      "categoryAccuracy": 1
+    },
+    "manual": {
+      "cases": 3,
+      "categoryAccuracy": 1
+    },
+    "warranty": {
+      "cases": 3,
+      "categoryAccuracy": 1
+    },
+    "note": {
+      "cases": 4,
+      "categoryAccuracy": 1
+    },
+    "calendar": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "document": {
+      "cases": 6,
+      "categoryAccuracy": 1
+    },
+    "presentation": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "installer": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "no-content": {
+      "cases": 6,
+      "categoryAccuracy": 1
+    },
+    "screenshot": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "photo": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "other": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    }
+  },
+  "results": [
+    {
+      "id": "receipt-1",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-12-03"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-12-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3879.5134169999997
+    },
+    {
+      "id": "receipt-4",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-04-25"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-04-25"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4458.268750000001
+    },
+    {
+      "id": "receipt-7",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-05-19"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-05-19"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4378.2855
+    },
+    {
+      "id": "receipt-10",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-05-27"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-05-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4404.439042
+    },
+    {
+      "id": "receipt-13",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-11-11"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-11-11"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3685.972999999998
+    },
+    {
+      "id": "receipt-16",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-01-24"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-01-24"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4047.6287919999995
+    },
+    {
+      "id": "koReceipt-1",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-01-10"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-01-10"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3783.777542
+    },
+    {
+      "id": "koReceipt-4",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2025-05-27"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2025-05-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3832.247958
+    },
+    {
+      "id": "koReceipt-7",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2025-03-12"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2025-03-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3692.293499999996
+    },
+    {
+      "id": "koReceipt-10",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2025-05-07"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2025-05-07"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3690.334084000002
+    },
+    {
+      "id": "paidInvoice-1",
+      "tags": [
+        "receipt",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-10-13"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-10-13"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3930.0453749999942
+    },
+    {
+      "id": "paidInvoice-4",
+      "tags": [
+        "receipt",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-02-01"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-02-01"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3868.1640830000033
+    },
+    {
+      "id": "paidInvoice-7",
+      "tags": [
+        "receipt",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-11-17"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-11-17"
+      },
+      "categoryOk": false,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3927.3029160000006
+    },
+    {
+      "id": "invoice-1",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2025-06-22"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2025-06-22"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3816.3222499999974
+    },
+    {
+      "id": "invoice-4",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-01-27"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-01-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4154.659208999998
+    },
+    {
+      "id": "invoice-7",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-02-12"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-02-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4196.369083000005
+    },
+    {
+      "id": "invoice-10",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-11-28"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-11-28"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4012.2511250000025
+    },
+    {
+      "id": "invoice-13",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-10-03"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-10-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4312.820292000004
+    },
+    {
+      "id": "koInvoice-1",
+      "tags": [
+        "invoice",
+        "korean"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-01-17"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-01-17"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3897.779833000008
+    },
+    {
+      "id": "koInvoice-4",
+      "tags": [
+        "invoice",
+        "korean"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-12-06"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-12-06"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4118.196708000003
+    },
+    {
+      "id": "koInvoice-7",
+      "tags": [
+        "invoice",
+        "korean"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2025-09-26"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2025-09-26"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4197.529832999993
+    },
+    {
+      "id": "statement-1",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2026-03-27"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2026-03-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6115.3269169999985
+    },
+    {
+      "id": "statement-4",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2026-01-03"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2026-01-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4685.800583000004
+    },
+    {
+      "id": "statement-7",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2026-10-15"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2026-10-15"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 5479.062250000003
+    },
+    {
+      "id": "statement-10",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2025-01-04"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2025-01-04"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 5511.684708999994
+    },
+    {
+      "id": "spreadsheet-1",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3087.9197920000006
+    },
+    {
+      "id": "spreadsheet-4",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3232.6878750000033
+    },
+    {
+      "id": "spreadsheet-7",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2995.340249999994
+    },
+    {
+      "id": "spreadsheet-10",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3091.9267910000053
+    },
+    {
+      "id": "booking-1",
+      "tags": [
+        "booking",
+        "korean"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-05-06"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-05-06"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 4071.225582999992
+    },
+    {
+      "id": "booking-4",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-09-22"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-09-22"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3576.3382500000007
+    },
+    {
+      "id": "booking-7",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-09-16"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-09-16"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3720.639624999996
+    },
+    {
+      "id": "booking-10",
+      "tags": [
+        "booking",
+        "korean"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2026-09-12"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2026-09-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3915.6981659999874
+    },
+    {
+      "id": "booking-13",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2026-11-15"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2026-11-15"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3571.585833000019
+    },
+    {
+      "id": "booking-16",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-09-01"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-09-01"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3633.34266699999
+    },
+    {
+      "id": "manual-1",
+      "tags": [
+        "manual"
+      ],
+      "expected": {
+        "category": "manual",
+        "date": null
+      },
+      "got": {
+        "category": "manual",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2865.696708000003
+    },
+    {
+      "id": "manual-4",
+      "tags": [
+        "manual"
+      ],
+      "expected": {
+        "category": "manual",
+        "date": null
+      },
+      "got": {
+        "category": "manual",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2865.8613750000077
+    },
+    {
+      "id": "manual-7",
+      "tags": [
+        "manual"
+      ],
+      "expected": {
+        "category": "manual",
+        "date": null
+      },
+      "got": {
+        "category": "manual",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2872.4496249999793
+    },
+    {
+      "id": "warranty-1",
+      "tags": [
+        "warranty"
+      ],
+      "expected": {
+        "category": "warranty",
+        "date": "2025-02-21"
+      },
+      "got": {
+        "category": "warranty",
+        "date": "2025-02-21"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3471.853040999995
+    },
+    {
+      "id": "warranty-4",
+      "tags": [
+        "warranty"
+      ],
+      "expected": {
+        "category": "warranty",
+        "date": "2025-10-08"
+      },
+      "got": {
+        "category": "warranty",
+        "date": "2025-10-08"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3411.8202920000185
+    },
+    {
+      "id": "warranty-7",
+      "tags": [
+        "warranty"
+      ],
+      "expected": {
+        "category": "warranty",
+        "date": "2026-10-22"
+      },
+      "got": {
+        "category": "warranty",
+        "date": "2026-10-22"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3575.001958000008
+    },
+    {
+      "id": "note-1",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": "2026-09-28"
+      },
+      "got": {
+        "category": "note",
+        "date": "2026-09-28"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2961.474041999987
+    },
+    {
+      "id": "note-4",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": "2025-11-11"
+      },
+      "got": {
+        "category": "note",
+        "date": "2025-11-11"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3214.5814580000006
+    },
+    {
+      "id": "note-7",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": null
+      },
+      "got": {
+        "category": "note",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2397.257958000002
+    },
+    {
+      "id": "note-10",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": "2026-09-15"
+      },
+      "got": {
+        "category": "note",
+        "date": "2026-09-15"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3308.5118749999965
+    },
+    {
+      "id": "calendar-1",
+      "tags": [
+        "calendar"
+      ],
+      "expected": {
+        "category": "calendar",
+        "date": "2026-01-09"
+      },
+      "got": {
+        "category": "calendar",
+        "date": "2026-01-09"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2605.508833
+    },
+    {
+      "id": "calendar-4",
+      "tags": [
+        "calendar"
+      ],
+      "expected": {
+        "category": "calendar",
+        "date": "2026-06-26"
+      },
+      "got": {
+        "category": "calendar",
+        "date": "2026-06-26"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2569.356875000027
+    },
+    {
+      "id": "document-1",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-02-26"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-02-26"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3254.11370799999
+    },
+    {
+      "id": "document-4",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-01-04"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-01-04"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3196.848874999996
+    },
+    {
+      "id": "document-7",
+      "tags": [
+        "document",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-09-14"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-09-14"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3432.283749999973
+    },
+    {
+      "id": "document-10",
+      "tags": [
+        "document",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-04-13"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-04-13"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3386.7453749999986
+    },
+    {
+      "id": "document-13",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-04-25"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-04-25"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3407.7937500000116
+    },
+    {
+      "id": "document-16",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2025-10-12"
+      },
+      "got": {
+        "category": "document",
+        "date": "2025-10-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3212.821667000011
+    },
+    {
+      "id": "presentation-1",
+      "tags": [
+        "presentation"
+      ],
+      "expected": {
+        "category": "presentation",
+        "date": null
+      },
+      "got": {
+        "category": "presentation",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3009.7589579999913
+    },
+    {
+      "id": "presentation-4",
+      "tags": [
+        "presentation"
+      ],
+      "expected": {
+        "category": "presentation",
+        "date": null
+      },
+      "got": {
+        "category": "presentation",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 3010.590750000003
+    },
+    {
+      "id": "installer-1",
+      "tags": [
+        "installer",
+        "no-content"
+      ],
+      "expected": {
+        "category": "installer",
+        "date": null
+      },
+      "got": {
+        "category": "installer",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2393.1812079999945
+    },
+    {
+      "id": "installer-4",
+      "tags": [
+        "installer",
+        "no-content"
+      ],
+      "expected": {
+        "category": "installer",
+        "date": null
+      },
+      "got": {
+        "category": "installer",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2229.418915999995
+    },
+    {
+      "id": "screenshot-1",
+      "tags": [
+        "screenshot",
+        "no-content"
+      ],
+      "expected": {
+        "category": "screenshot",
+        "date": "2026-10-24"
+      },
+      "got": {
+        "category": "screenshot",
+        "date": "2026-10-24"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2446.7074999999895
+    },
+    {
+      "id": "screenshot-4",
+      "tags": [
+        "screenshot",
+        "no-content"
+      ],
+      "expected": {
+        "category": "screenshot",
+        "date": "2026-07-03"
+      },
+      "got": {
+        "category": "screenshot",
+        "date": "2026-07-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2442.641250000015
+    },
+    {
+      "id": "photo-1",
+      "tags": [
+        "photo",
+        "no-content"
+      ],
+      "expected": {
+        "category": "photo",
+        "date": null
+      },
+      "got": {
+        "category": "photo",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2601.9495419999876
+    },
+    {
+      "id": "photo-4",
+      "tags": [
+        "photo",
+        "no-content"
+      ],
+      "expected": {
+        "category": "photo",
+        "date": null
+      },
+      "got": {
+        "category": "photo",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2740.6864999999816
+    },
+    {
+      "id": "other-1",
+      "tags": [
+        "other"
+      ],
+      "expected": {
+        "category": "other",
+        "date": null
+      },
+      "got": {
+        "category": "other",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2396.1423340000038
+    },
+    {
+      "id": "other-4",
+      "tags": [
+        "other"
+      ],
+      "expected": {
+        "category": "other",
+        "date": null
+      },
+      "got": {
+        "category": "other",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 2393.9624170000025
+    }
+  ]
+}

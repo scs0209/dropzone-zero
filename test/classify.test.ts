@@ -131,3 +131,13 @@ describe("classifyFile", () => {
     assert.equal(result.newName, "scan0001.pdf");
   });
 });
+
+describe("slugify", () => {
+  it("keeps letters in any script and drops accents", async () => {
+    const { slugify } = await import("../src/classify.js");
+    assert.equal(slugify("솔향베이커리 영수증"), "솔향베이커리-영수증");
+    assert.equal(slugify("Café Déjà Vu receipt"), "cafe-deja-vu-receipt");
+    assert.equal(slugify("請求書 2026"), "請求書-2026");
+    assert.equal(slugify("!!!"), "");
+  });
+});

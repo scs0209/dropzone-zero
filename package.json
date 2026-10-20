@@ -20,7 +20,8 @@
     "seed:history": "node --import tsx scripts/seed-history.ts",
     "app": "node scripts/vendor-three.mjs && tauri dev --config app/src-tauri/tauri.conf.json",
     "app:build": "node scripts/vendor-three.mjs && tauri build --config app/src-tauri/tauri.conf.json",
-    "app:vendor": "node scripts/vendor-three.mjs"
+    "app:vendor": "node scripts/vendor-three.mjs",
+    "eval:make": "node --import tsx scripts/make-eval.ts"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.1",

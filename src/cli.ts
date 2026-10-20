@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { createInterface } from "node:readline/promises";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
 import {
@@ -54,6 +55,8 @@ Usage:
                                  allows and asks you, right there, about the rest
   dz recent [folder] [--reveal] [--file <name>] [--limit N]
                                  Show what moved where; --reveal opens it in Finder
+  dz eval [--split test|train|all] [--json]
+                                 Score the model on the synthetic labeled set in eval/
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
   dz daemon [folder]             Run the watcher with a local API for the Zee desktop app
   dz autostart enable [folder] | disable | status
@@ -564,6 +567,42 @@ async function daemon(folder: string): Promise<void> {
   });
 }
 
+/** Scores a model on the synthetic labeled set (eval/cases.jsonl) through the real pipeline. */
+async function evaluate(split: string, json: boolean): Promise<void> {
+  if (split !== "train" && split !== "test" && split !== "all") throw new Error("--split must be train, test, or all.");
+  const { loadCases, runEval } = await import("./eval.js");
+  const client = new OllamaClient();
+  await client.ensureReady();
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+  const cases = await loadCases(join(repo, "eval", "cases.jsonl"), split);
+  const report = await runEval(client, `ollama:${client.model}`, cases, split, (done, total) => {
+    if (process.stderr.isTTY) process.stderr.write(`\rEvaluating ${done}/${total}...`);
+  });
+  if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
+
+  const out = join(repo, "eval", "results", `${report.model.replace(/[^a-z0-9.-]+/gi, "_")}-${split}.json`);
+  await mkdir(dirname(out), { recursive: true });
+  await writeFile(out, JSON.stringify(report, null, 2) + "\n");
+  if (json) {
+    process.stdout.write(JSON.stringify(report, null, 2) + "\n");
+    return;
+  }
+  const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
+  console.log(`${report.model} on ${report.cases} ${split} cases`);
+  console.log(`  Category accuracy  ${pct(report.categoryAccuracy)}`);
+  console.log(`  Date accuracy      ${pct(report.dateAccuracy)}`);
+  console.log(`  Invalid output     ${pct(report.invalidRate)}`);
+  console.log(`  Latency            p50 ${report.latencyMs.p50} ms, p95 ${report.latencyMs.p95} ms`);
+  console.log("  By tag:");
+  for (const [tag, t] of Object.entries(report.byTag).sort()) console.log(`    ${tag.padEnd(14)} ${pct(t.categoryAccuracy).padStart(6)}  (${t.cases})`);
+  const misses = report.results.filter((r) => !r.categoryOk);
+  if (misses.length) {
+    console.log("  Misses:");
+    for (const r of misses) console.log(`    ${r.id.padEnd(16)} expected ${r.expected.category}, got ${r.got.category}`);
+  }
+  console.log(`Saved ${relative(process.cwd(), out)}`);
+}
+
 async function approve(folder: string, files: string[], all: boolean): Promise<void> {
   if (!all && files.length === 0) throw new Error("Name the files to approve with --file <name>, or pass --all.");
   const { approved, unmatched } = await approveItems(folder, all ? "all" : files);
@@ -677,6 +716,7 @@ async function main(): Promise<void> {
       auto: { type: "boolean" },
       reveal: { type: "boolean" },
       limit: { type: "string" },
+      split: { type: "string" },
       "include-existing": { type: "boolean" },
     },
   });
@@ -696,6 +736,7 @@ async function main(): Promise<void> {
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
   if (command === "status") return status(folder, json);
+  if (command === "eval") return evaluate(values.split ?? "test", json);
   if (command === "recent") {
     return recent(folder, json, values.reveal ?? false, values.file?.[0], Number(values.limit ?? 20));
   }

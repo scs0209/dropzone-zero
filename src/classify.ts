@@ -138,15 +138,23 @@ ${body}`;
 }
 
 /** Lowercase kebab-case, ASCII only. */
+/**
+ * Lowercase kebab-case that keeps letters in any script. Accents are dropped
+ * (café -> cafe), but Korean, Japanese, and other letters stay: an ASCII-only
+ * slug turned every Korean title into an empty name, so those files could never
+ * be filed (found by `dz eval`).
+ */
 export function slugify(text: string): string {
-  return text
+  const slug = text
     .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\p{M}/gu, "")
+    // Recompose: NFKD splits Hangul syllables into jamo.
+    .normalize("NFC")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60)
-    .replace(/-+$/, "");
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  // Cut by characters, not UTF-16 units, so a syllable is never split in half.
+  return Array.from(slug).slice(0, 60).join("").replace(/-+$/, "");
 }
 
 /** Accepts a real calendar date between 1990 and two years from now; anything else becomes null. */
