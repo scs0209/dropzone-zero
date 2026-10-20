@@ -55,8 +55,8 @@ Usage:
                                  allows and asks you, right there, about the rest
   dz recent [folder] [--reveal] [--file <name>] [--limit N]
                                  Show what moved where; --reveal opens it in Finder
-  dz eval [--split test|train|all] [--json]
-                                 Score the model on the synthetic labeled set in eval/
+  dz eval [--split test|train|all] [--provider ollama|backboard] [--model name] [--json]
+                                 Score a model on the synthetic labeled set in eval/
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
   dz daemon [folder]             Run the watcher with a local API for the Zee desktop app
   dz autostart enable [folder] | disable | status
@@ -568,16 +568,48 @@ async function daemon(folder: string): Promise<void> {
 }
 
 /** Scores a model on the synthetic labeled set (eval/cases.jsonl) through the real pipeline. */
-async function evaluate(split: string, json: boolean): Promise<void> {
+async function evaluate(split: string, json: boolean, provider: string, model: string | undefined): Promise<void> {
   if (split !== "train" && split !== "test" && split !== "all") throw new Error("--split must be train, test, or all.");
   const { loadCases, runEval } = await import("./eval.js");
-  const client = new OllamaClient();
-  await client.ensureReady();
+  let client: import("./classify.js").ModelClient;
+  let label: string;
+  let finish = async (): Promise<Record<string, unknown>> => ({});
+  if (provider === "ollama") {
+    const ollama = new OllamaClient(model ? { model } : {});
+    await ollama.ensureReady();
+    client = ollama;
+    label = `ollama:${ollama.model}`;
+  } else if (provider === "backboard") {
+    // --model upstream:name, e.g. openrouter:google/gemma-4-31b-it
+    const [upstream, ...rest] = (model ?? "").split(":");
+    if (!upstream || rest.length === 0) throw new Error("Pass --model <provider>:<model>, e.g. openrouter:google/gemma-4-31b-it.");
+    const apiKey = process.env.BACKBOARD_API_KEY;
+    if (!apiKey) throw new Error("Set BACKBOARD_API_KEY in .env.");
+    const { BackboardClient } = await import("./backboard.js");
+    const backboard = new BackboardClient({ apiKey, provider: upstream, model: rest.join(":") });
+    await backboard.init();
+    client = backboard;
+    label = `backboard:${upstream}/${rest.join(":")}`;
+    finish = async () => {
+      await backboard.close();
+      return { usage: backboard.usage };
+    };
+  } else {
+    throw new Error("--provider must be ollama or backboard.");
+  }
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   const cases = await loadCases(join(repo, "eval", "cases.jsonl"), split);
-  const report = await runEval(client, `ollama:${client.model}`, cases, split, (done, total) => {
-    if (process.stderr.isTTY) process.stderr.write(`\rEvaluating ${done}/${total}...`);
-  });
+  let base: Awaited<ReturnType<typeof runEval>>;
+  let extra: Record<string, unknown> = {};
+  try {
+    base = await runEval(client, label, cases, split, (done, total) => {
+      if (process.stderr.isTTY) process.stderr.write(`\rEvaluating ${done}/${total}...`);
+    });
+  } finally {
+    // Always clean up (Backboard: delete the run's assistant), even if the run failed.
+    extra = await finish();
+  }
+  const report: typeof base & Record<string, unknown> = { ...base, ...extra };
   if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
 
   const out = join(repo, "eval", "results", `${report.model.replace(/[^a-z0-9.-]+/gi, "_")}-${split}.json`);
@@ -593,6 +625,11 @@ async function evaluate(split: string, json: boolean): Promise<void> {
   console.log(`  Date accuracy      ${pct(report.dateAccuracy)}`);
   console.log(`  Invalid output     ${pct(report.invalidRate)}`);
   console.log(`  Latency            p50 ${report.latencyMs.p50} ms, p95 ${report.latencyMs.p95} ms`);
+  const usage = report.usage as { calls: number; inputTokens: number; outputTokens: number; costUsd: number | null } | undefined;
+  if (usage) {
+    const cost = usage.costUsd == null ? "unknown" : `$${usage.costUsd.toFixed(4)}`;
+    console.log(`  Usage              ${usage.calls} calls, ${usage.inputTokens} in / ${usage.outputTokens} out tokens, cost ${cost}`);
+  }
   console.log("  By tag:");
   for (const [tag, t] of Object.entries(report.byTag).sort()) console.log(`    ${tag.padEnd(14)} ${pct(t.categoryAccuracy).padStart(6)}  (${t.cases})`);
   const misses = report.results.filter((r) => !r.categoryOk);
@@ -717,6 +754,8 @@ async function main(): Promise<void> {
       reveal: { type: "boolean" },
       limit: { type: "string" },
       split: { type: "string" },
+      provider: { type: "string" },
+      model: { type: "string" },
       "include-existing": { type: "boolean" },
     },
   });
@@ -736,7 +775,7 @@ async function main(): Promise<void> {
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
   if (command === "status") return status(folder, json);
-  if (command === "eval") return evaluate(values.split ?? "test", json);
+  if (command === "eval") return evaluate(values.split ?? "test", json, values.provider ?? "ollama", values.model);
   if (command === "recent") {
     return recent(folder, json, values.reveal ?? false, values.file?.[0], Number(values.limit ?? 20));
   }
