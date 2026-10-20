@@ -34,22 +34,27 @@ const trimMat = clay(0xc5ced4, 0.4);
 const robot = new THREE.Group();
 scene.add(robot);
 
-robot.add(mesh(new RoundedBoxGeometry(1.8, 1.5, 1.3, 6, 0.32), shellMat, 0, 0.9, 0));
+// The upper body and its screen face are one piece ("head") that turns toward the
+// pointer; only the wheeled base stays put. Turning the screen on its own let it
+// sink into the shell, so the white surface covered the face.
 const head = new THREE.Group();
 head.position.set(0, 0.95, 0);
 robot.add(head);
-head.add(mesh(new RoundedBoxGeometry(1.36, 0.98, 0.1, 4, 0.12), clay(0x1d2731, 0.25), 0, 0.02, 0.62));
+head.add(mesh(new RoundedBoxGeometry(1.8, 1.5, 1.3, 6, 0.32), shellMat, 0, -0.05, 0));
+// The screen stands slightly proud of the shell's face (front at z 0.65), so no edge is hidden.
+const FACE_Z = 0.74;
+head.add(mesh(new RoundedBoxGeometry(1.36, 0.98, 0.1, 4, 0.12), clay(0x1d2731, 0.25), 0, 0.02, FACE_Z - 0.05));
 
 const eyeMat = new THREE.MeshBasicMaterial({ color: 0x5dcaa5 });
 const eyes = [-0.28, 0.28].map((x) => {
-  const eye = mesh(new THREE.SphereGeometry(0.12, 20, 14), eyeMat, x, 0.08, 0.69);
+  const eye = mesh(new THREE.SphereGeometry(0.12, 20, 14), eyeMat, x, 0.08, FACE_Z + 0.01);
   head.add(eye);
   return eye;
 });
 
 // A mouth on the screen face, shown while eating: an oval that opens and closes.
 const MOUTH_Y = -0.2;
-const mouth = mesh(new THREE.TorusGeometry(0.11, 0.03, 8, 32), eyeMat, 0, MOUTH_Y, 0.69);
+const mouth = mesh(new THREE.TorusGeometry(0.11, 0.03, 8, 32), eyeMat, 0, MOUTH_Y, FACE_Z + 0.01);
 mouth.scale.x = 1.35;
 head.add(mouth);
 
@@ -64,8 +69,8 @@ for (const x of [-0.45, 0.45]) {
   robot.add(wheel);
 }
 
-const arm = mesh(new THREE.CapsuleGeometry(0.12, 0.5, 6, 12), trimMat, 1.15, 1.2, 0.2);
-robot.add(arm);
+const arm = mesh(new THREE.CapsuleGeometry(0.12, 0.5, 6, 12), trimMat, 1.15, 0.25, 0.2);
+head.add(arm);
 const page = mesh(new RoundedBoxGeometry(0.4, 0.52, 0.04, 2, 0.02), clay(0xffffff));
 robot.add(page);
 
@@ -139,7 +144,7 @@ function frame() {
   if (page.visible) {
     const p = (t * 0.9) % 1;
     // From the upper right straight into the mouth.
-    page.position.set(1.6 - p * 1.6, 2.2 - p * (2.2 - (0.95 + MOUTH_Y)), 0.6 + p * 0.15);
+    page.position.set(1.6 - p * 1.6, 2.2 - p * (2.2 - (0.95 + MOUTH_Y)), 0.6 + p * 0.25);
     page.rotation.z = p * 3;
     page.scale.setScalar(1 - p * 0.7);
     head.scale.y = 1 + Math.sin(t * 18) * 0.04;
