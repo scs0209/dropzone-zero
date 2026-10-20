@@ -1,6 +1,8 @@
 #!/usr/bin/env node
+import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { extname, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
@@ -18,6 +20,7 @@ import { contentKindOf, extractContent } from "./extract.js";
 import { newRunId } from "./journal.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
+import { extractReceipt, findReceiptFiles, toCsv, type ReceiptRow } from "./receipts.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
 import { captureError, flushTelemetry, initTelemetry, recordCounts, recordDuration, withSpan } from "./telemetry.js";
 
@@ -32,6 +35,8 @@ Usage:
   dz undo [folder] [--yes] [--temporal]
                                  Put back everything the last run moved
   dz worker                      Run a Temporal worker that finishes interrupted runs
+  dz receipts [folder] [--out file.csv]
+                                 Export vendor, date, and total of receipts and invoices to CSV
 
 Options:
   --summary                      Print only counts and timings, no file names
@@ -245,6 +250,45 @@ async function undo(folder: string, yes: boolean, temporal: boolean): Promise<vo
   printFailures(result.failed);
 }
 
+/** Finance/receipts-2026-10-20.csv, or -2, -3, ... so an export never overwrites an earlier one. */
+function defaultCsvPath(folder: string): string {
+  const base = join(folder, "Finance", `receipts-${new Date().toISOString().slice(0, 10)}`);
+  let path = `${base}.csv`;
+  for (let n = 2; existsSync(path); n++) path = `${base}-${n}.csv`;
+  return path;
+}
+
+async function receipts(folder: string, out: string | undefined): Promise<void> {
+  const found = await findReceiptFiles(folder);
+  if (found.length === 0) {
+    console.log("No receipts or invoices found. Run `dz preview` (and `dz run`) first.");
+    return;
+  }
+  const client = new OllamaClient();
+  await client.ensureReady();
+
+  const rows: ReceiptRow[] = [];
+  for (const [index, receipt] of found.entries()) {
+    if (process.stderr.isTTY) process.stderr.write(`\rReading ${index + 1}/${found.length}...`);
+    rows.push(await extractReceipt(client, folder, receipt, await extractContent(receipt.file)));
+  }
+  if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
+  rows.sort((a, b) => (a.date ?? "9999").localeCompare(b.date ?? "9999") || a.file.localeCompare(b.file));
+
+  const path = out ? resolve(expandHome(out)) : defaultCsvPath(folder);
+  if (out && existsSync(path)) throw new Error(`${path} already exists; choose another --out.`);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, toCsv(rows));
+
+  for (const row of rows) {
+    const total = row.total === null ? "" : `${row.total.toFixed(2)} ${row.currency ?? ""}`.trim();
+    console.log([(row.date ?? "?").padEnd(10), (row.vendor ?? "?").padEnd(24), total.padStart(14), `  ${row.status}`].join("  "));
+  }
+  const checks = rows.filter((row) => row.status !== "ok").length;
+  recordCounts("dz.receipts", { rows: rows.length, checks });
+  console.log(`\nWrote ${rows.length} rows to ${relative(process.cwd(), path) || path}${checks ? `; ${checks} need a look` : ""}.`);
+}
+
 async function scan(folder: string, json: boolean): Promise<void> {
   const files = await scanFolder(folder);
 
@@ -277,6 +321,7 @@ async function main(): Promise<void> {
       summary: { type: "boolean" },
       yes: { type: "boolean", short: "y" },
       temporal: { type: "boolean" },
+      out: { type: "string" },
     },
   });
   const [command, folderArg] = positionals;
@@ -293,6 +338,7 @@ async function main(): Promise<void> {
   if (command === "run") return run(folder, values.yes ?? false, values.temporal ?? false);
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false);
   if (command === "worker") return startWorker();
+  if (command === "receipts") return receipts(folder, values.out);
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");
 
   process.stderr.write(`Unknown command: ${command}\n\n${USAGE}`);

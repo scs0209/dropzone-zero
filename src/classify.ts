@@ -43,8 +43,8 @@ export interface ClassifyResult extends Classification {
 
 /** Anything that turns a prompt into raw model output. Ollama in production, a stub in tests. */
 export interface ModelClient {
-  /** `images` are base64-encoded files for multimodal models. */
-  generate(prompt: string, images?: string[]): Promise<string>;
+  /** `images` are base64-encoded files for multimodal models; `schema` constrains the JSON reply. */
+  generate(prompt: string, images?: string[], schema?: object): Promise<string>;
 }
 
 /**
@@ -257,7 +257,7 @@ export async function classifyFile(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let raw: string;
     try {
-      raw = await client.generate(prompt, content.image ? [content.image] : undefined);
+      raw = await client.generate(prompt, content.image ? [content.image] : undefined, CLASSIFICATION_SCHEMA);
     } catch (error) {
       // Some images (CMYK JPEGs, mislabeled files) fail to decode. Classify those from
       // name and size instead; without an image, a failure means the model itself is down.

@@ -1,4 +1,4 @@
-import { CLASSIFICATION_SCHEMA, type ModelClient } from "./classify.js";
+import type { ModelClient } from "./classify.js";
 
 export const DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434";
 // Gemma 4 E4B: Apache 2.0, multimodal, and small enough for a laptop. Tagged explicitly
@@ -42,7 +42,7 @@ export class OllamaClient implements ModelClient {
     }
   }
 
-  async generate(prompt: string, images?: string[]): Promise<string> {
+  async generate(prompt: string, images?: string[], schema?: object): Promise<string> {
     const response = await fetch(`${this.host}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -52,7 +52,8 @@ export class OllamaClient implements ModelClient {
         prompt,
         ...(images?.length ? { images } : {}),
         stream: false,
-        format: CLASSIFICATION_SCHEMA,
+        // Structured output: Ollama constrains generation to this JSON schema.
+        format: schema ?? "json",
         // Gemma 4 thinks by default; for a one-file classification that costs ~15x the time for no gain.
         think: false,
         options: { temperature: 0 },

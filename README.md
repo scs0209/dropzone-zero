@@ -38,6 +38,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz run [folder]` | Carries out the saved plan after you confirm, verifying each file by hash before and after it moves |
 | `dz undo [folder]` | Reverses the most recent run: files go back to their old names and places, and folders the run created are removed if empty |
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
+| `dz receipts [folder]` | Reads every receipt and invoice and writes date, vendor, total, currency, and document number to a CSV |
 
 `scan` and `preview` take `--json` for machine-readable output; `run` and `undo` take `--yes` to skip the confirmation, and `--temporal` to run as a durable workflow (below). `dz preview --summary` prints only counts and timings, with no file names, so you can share how it did on a real folder without sharing what is in it. The folder defaults to `DZ_INBOX`, then `~/Downloads`.
 
@@ -49,6 +50,18 @@ Dropzone Zero keeps its state in a hidden `.dropzone` folder inside the folder i
 - A file is skipped, not moved, if it changed since the preview, if its target already exists, or if a target would leave the folder.
 - Every move is a rename inside the same folder tree: no copy, no delete, and the file is never in two places or none. The journal records each move as "started" before the rename and "done" after the new location is hashed, so even a run interrupted mid-move can be undone.
 - `dz undo` moves a file back only if it still has the hash it was moved with and its old place is free. If you edited a file after the run, undo leaves it where it is and tells you.
+
+## Receipts to CSV
+
+After a run, `dz receipts` reads everything under `Finance/Receipts` and `Finance/Invoices` (and anything the saved plan marks as a receipt or invoice but has not moved yet), including photographed receipts, and writes `Finance/receipts-YYYY-MM-DD.csv`:
+
+```csv
+date,vendor,kind,total,currency,document_number,file,status
+2026-10-11,JUNIPER MARKET,receipt,23.35,USD,0417-22,Finance/Receipts/2026-10/2026-10-11-juniper-market-receipt.jpg,ok
+,Pixelwave Hosting,invoice,12.00,USD,INV-3391,Finance/Invoices/2026-10/2026-10-31-pixelwave-hosting-invoice-payment.pdf,check: date
+```
+
+The same rule as for file dates applies: a value is kept only if it is printed in the document (`103.99`, `1,234.50`, `1.234,50`, and `12,000` all count). Anything the model cannot point to is left blank, and the row says `check:` with what is missing, so a wrong number never slips into your bookkeeping looking like a right one. On the demo, all six receipts and invoices come out right; the two marked for checking really have no purchase date. Exports never overwrite an earlier one, and cells that start with `=`, `+`, `-`, or `@` are escaped so a spreadsheet will not run them as formulas.
 
 ## Durable runs with Temporal
 
