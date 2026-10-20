@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { homedir } from "node:os";
 import { extname, resolve } from "node:path";
+import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
+import { executePlan, lastUndoableRun, loadPlan, savePlan, undoRun } from "./execute.js";
 import { contentKindOf, extractContent } from "./extract.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
@@ -14,10 +16,13 @@ const USAGE = `Dropzone Zero - keeps your Downloads folder tidy, with every move
 Usage:
   dz scan [folder] [--json]      List files with size, age, hash, and flags
   dz preview [folder] [--json | --summary]
-                                 Plan new names and folders with a local model (read-only)
+                                 Plan new names and folders with a local model (moves nothing)
+  dz run [folder] [--yes]        Carry out the last preview, verifying every move
+  dz undo [folder] [--yes]       Put back everything the last run moved
 
 Options:
   --summary                      Print only counts and timings, no file names
+  -y, --yes                      Do not ask for confirmation
   -h, --help                     Show this help
 
 Environment:
@@ -66,6 +71,7 @@ function printPlan(plan: PlanItem[], folder: string): void {
     );
   }
   console.log(`\n${counts.move} to move, ${counts.quarantine} to quarantine, ${counts.skip} to skip.`);
+  console.log("Run `dz run` to carry out this plan; `dz undo` reverses it.");
 }
 
 function countBy<T>(items: T[], key: (item: T) => string): string {
@@ -122,9 +128,75 @@ async function preview(folder: string, format: "table" | "json" | "summary"): Pr
     fallback: plan.filter((item) => item.source === "fallback").length,
   });
 
+  await savePlan(folder, client.model, plan);
+
   if (format === "json") process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
   else if (format === "summary") printSummary(plan, (performance.now() - started) / 1000);
   else printPlan(plan, folder);
+}
+
+async function confirm(question: string, yes: boolean): Promise<boolean> {
+  if (yes) return true;
+  if (!process.stdin.isTTY) {
+    process.stderr.write("Not a terminal; pass --yes to confirm.\n");
+    return false;
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question(`${question} [y/N] `);
+  rl.close();
+  return /^y(es)?$/i.test(answer.trim());
+}
+
+function printFailures(failed: { name: string; error: string }[]): void {
+  for (const { name, error } of failed) console.log(`  failed  ${name}: ${error}`);
+}
+
+async function run(folder: string, yes: boolean): Promise<void> {
+  const plan = await loadPlan(folder);
+  if (!plan || plan.inbox !== folder) {
+    throw new Error(`No saved plan for ${folder}. Run \`dz preview\` first.`);
+  }
+  const counts = summarize(plan.items);
+  const work = counts.move + counts.quarantine;
+  if (work === 0) {
+    console.log("The plan has nothing to move.");
+    return;
+  }
+  const question = `Move ${counts.move} and quarantine ${counts.quarantine} files, as planned at ${plan.createdAt}?`;
+  if (!(await confirm(question, yes))) {
+    console.log("Nothing was moved.");
+    return;
+  }
+
+  const started = performance.now();
+  const result = await withSpan("dz.run", () =>
+    executePlan(folder, plan.items, (done, total) => {
+      if (process.stderr.isTTY) process.stderr.write(`\rMoving ${done}/${total}...`);
+    }),
+  );
+  if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
+  recordDuration("dz.run.duration", performance.now() - started);
+  recordCounts("dz.run", { moved: result.moved, failed: result.failed.length });
+
+  console.log(`Run ${result.run}: moved ${result.moved} of ${work} files, every one verified by SHA-256.`);
+  printFailures(result.failed);
+  console.log("Changed your mind? `dz undo` puts everything back.");
+}
+
+async function undo(folder: string, yes: boolean): Promise<void> {
+  const runId = await lastUndoableRun(folder);
+  if (!runId) {
+    console.log("Nothing to undo.");
+    return;
+  }
+  if (!(await confirm(`Undo run ${runId}?`, yes))) {
+    console.log("Nothing was changed.");
+    return;
+  }
+  const result = await withSpan("dz.undo", () => undoRun(folder, runId));
+  recordCounts("dz.undo", { restored: result.restored, failed: result.failed.length });
+  console.log(`Undid run ${runId}: restored ${result.restored} files.`);
+  printFailures(result.failed);
 }
 
 async function scan(folder: string, json: boolean): Promise<void> {
@@ -157,6 +229,7 @@ async function main(): Promise<void> {
       help: { type: "boolean", short: "h" },
       json: { type: "boolean" },
       summary: { type: "boolean" },
+      yes: { type: "boolean", short: "y" },
     },
   });
   const [command, folderArg] = positionals;
@@ -170,6 +243,8 @@ async function main(): Promise<void> {
   const json = values.json ?? false;
 
   if (command === "scan") return scan(folder, json);
+  if (command === "run") return run(folder, values.yes ?? false);
+  if (command === "undo") return undo(folder, values.yes ?? false);
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");
 
   process.stderr.write(`Unknown command: ${command}\n\n${USAGE}`);

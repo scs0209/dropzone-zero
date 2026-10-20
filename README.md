@@ -10,7 +10,7 @@ Receipts, booking confirmations, photos, manuals, and half-finished downloads pi
 
 - **Your files stay on your machine.** Classification runs on a local model. Cloud services only ever see the synthetic demo files or aggregate counts.
 - **Nothing is deleted.** Duplicates and stale temp files go to a quarantine folder you can empty yourself.
-- **Every action is reversible and verified.** Files are copied, hash-checked, and only then is the original moved to quarantine.
+- **Every action is reversible and verified.** A file only moves if it still has the SHA-256 hash it had when you previewed it, and it is hashed again at its new place. Every step is written to a journal before and after it happens.
 - **Preview before acting.** Bulk changes wait for your approval.
 
 ## Quick start
@@ -23,6 +23,8 @@ ollama pull gemma4:e4b  # about 6.6 GB, once
 ollama serve            # skip if the Ollama app is already running
 pnpm seed               # creates demo/inbox with 31 synthetic files
 pnpm dz preview demo/inbox
+pnpm dz run demo/inbox      # asks before moving anything
+pnpm dz undo demo/inbox     # puts every file back
 ```
 
 On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 seconds with `gemma4:e4b`, most of it spent looking at images. On a real Downloads folder with larger PDFs and photos, expect about 5 seconds per file. Gemma 4 thinks before answering by default; Dropzone Zero turns that off, because for one-file classification it was about 15 times slower with no better answers.
@@ -32,11 +34,20 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | Command | What it does |
 |---|---|
 | `dz scan [folder]` | Lists files with size, age, hash, and flags (partial download, empty, duplicate) |
-| `dz preview [folder]` | Plans a new name and folder for every file with the local model. Read-only: nothing moves |
+| `dz preview [folder]` | Plans a new name and folder for every file with the local model and saves the plan. Nothing moves |
+| `dz run [folder]` | Carries out the saved plan after you confirm, verifying each file by hash before and after it moves |
+| `dz undo [folder]` | Reverses the most recent run: files go back to their old names and places, and folders the run created are removed if empty |
 
-Both commands take `--json` for machine-readable output. `dz preview --summary` prints only counts and timings, with no file names, so you can share how it did on a real folder without sharing what is in it. The folder defaults to `DZ_INBOX`, then `~/Downloads`.
+`scan` and `preview` take `--json` for machine-readable output; `run` and `undo` take `--yes` to skip the confirmation. `dz preview --summary` prints only counts and timings, with no file names, so you can share how it did on a real folder without sharing what is in it. The folder defaults to `DZ_INBOX`, then `~/Downloads`.
 
-More commands (`run`, `undo`) are on the way.
+Dropzone Zero keeps its state in a hidden `.dropzone` folder inside the folder it organizes: the saved plan, the journal (`journal.jsonl`), and `quarantine/`. Quarantine is never emptied for you.
+
+## How a run stays safe
+
+- `dz run` executes exactly the plan you previewed. The model is not asked again, so what you saw is what happens.
+- A file is skipped, not moved, if it changed since the preview, if its target already exists, or if a target would leave the folder.
+- Every move is a rename inside the same folder tree: no copy, no delete, and the file is never in two places or none. The journal records each move as "started" before the rename and "done" after the new location is hashed, so even a run interrupted mid-move can be undone.
+- `dz undo` moves a file back only if it still has the hash it was moved with and its old place is free. If you edited a file after the run, undo leaves it where it is and tells you.
 
 ## How a plan is made
 
@@ -60,8 +71,9 @@ Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves,
 
 - [x] Scan with SHA-256 duplicate detection
 - [x] Local classification with Gemma 4 through Ollama, and `dz preview`
-- [ ] `dz run`: copy, verify the hash, then move the original, journaling every step (Temporal workflow)
-- [ ] `dz undo` from the journal
+- [x] `dz run` with hash checks before and after every move, journaled
+- [x] `dz undo` from the journal
+- [ ] Run and undo as a durable [Temporal](https://temporal.io) workflow, so a crash or reboot resumes where it stopped
 - [x] Gemma vision for photos and screenshots (Ollama's `images` field)
 - [ ] Vision for scanned PDFs that have no text layer (render the first page to an image)
 - [ ] [Mastra](https://mastra.ai) agent wrapper. Not added yet: today the classifier is one structured call per file with no tools, and Mastra's agent would need an extra AI SDK provider for Ollama to do the same thing. It becomes worthwhile once the agent has tools to call (journal lookups, receipt-to-CSV, calendar follow-ups).

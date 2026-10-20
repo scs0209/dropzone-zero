@@ -4,13 +4,18 @@ import type { Category, ClassifyResult } from "./classify.js";
 import { applyRules, type Action } from "./rules.js";
 import type { ScannedFile } from "./scan.js";
 
+/** Where Dropzone Zero keeps its own state: the saved plan, the journal, and quarantine. */
+export const STATE_DIR = ".dropzone";
+
 /** Inside the inbox and hidden, so scans skip it. The user empties it; Dropzone Zero never deletes. */
-export const QUARANTINE_DIR = ".dropzone/quarantine";
+export const QUARANTINE_DIR = `${STATE_DIR}/quarantine`;
 /** Below this, the file stays where it is and the plan says why. */
 export const MIN_CONFIDENCE = 0.5;
 
 export interface PlanItem {
   name: string;
+  /** Content hash at planning time; `dz run` refuses to move a file that changed since. */
+  sha256: string;
   action: Action;
   /** Null when a rule decided without asking the model. */
   category: Category | null;
@@ -50,6 +55,7 @@ export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions)
     if (rule) {
       plan.push({
         name: file.name,
+        sha256: file.sha256,
         action: rule.action,
         category: null,
         target: rule.action === "quarantine" ? uniqueTarget(inbox, `${QUARANTINE_DIR}/${file.name}`, taken) : null,
@@ -59,7 +65,7 @@ export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions)
       });
     } else {
       const result = await classify(file);
-      const base = { name: file.name, category: result.category, confidence: result.confidence, source: result.source };
+      const base = { name: file.name, sha256: file.sha256, category: result.category, confidence: result.confidence, source: result.source };
       if (result.source === "fallback" || result.confidence < MIN_CONFIDENCE) {
         const why = result.source === "fallback" ? result.reason : `Low confidence: ${result.reason}`;
         plan.push({ ...base, action: "skip", target: null, reason: why });
