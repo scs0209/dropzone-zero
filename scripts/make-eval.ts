@@ -1,6 +1,6 @@
 // Builds eval/cases.jsonl: synthetic, labeled downloads for measuring and
 // improving the classifier. Every vendor, name, and amount is made up, so the
-// set can be sent to cloud services (Backboard, Tinker) without exposing anyone's
+// set can be sent to cloud services (Tinker) without exposing anyone's
 // files. It aims at what the demo folder made too easy: Korean documents,
 // different date formats, misleading file names, and look-alike categories
 // (receipt vs invoice, statement vs spreadsheet, note vs document).

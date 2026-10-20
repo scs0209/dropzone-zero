@@ -362,7 +362,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "tabpfn", specifier = "==9.1.0" },
-    { name = "tinker", specifier = "==0.32.0" },
+    { name = "tinker", specifier = "==0.34.0" },
 ]
 
 [[package]]
@@ -1880,7 +1880,7 @@ wheels = [
 
 [[package]]
 name = "tinker"
-version = "0.32.0"
+version = "0.34.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1899,9 +1899,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "zstandard" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4a/87/9c3614892ef89e64d6365f54b065ab2d2fdf90b8aadacc56e435e91e9bf1/tinker-0.32.0.tar.gz", hash = "sha256:42d1a6720aeef89382144050f1d27f8acfb0b9f29bce1b8421861f1a589e4db9", size = 299677, upload-time = "2026-10-02T18:02:56.225Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6f/1b/5d4136d92c4fb19ad1dc2fd632d2acc05e41d132349e3df0ef729f7e4669/tinker-0.34.0.tar.gz", hash = "sha256:2fc801882dab940818c7a17efb2e89fad626d4c965470c1a69f8c2d7d996e905", size = 308816, upload-time = "2026-10-17T01:13:27.839Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/59/74de82c92e124583f71503b850a66103dfa8f941156d88cce4afc4ab62f3/tinker-0.32.0-py3-none-any.whl", hash = "sha256:8c2d3818ae2dcc3cbc56f5484139f4ae8d1fef3d90ff47375a4501d0a2f48e1d", size = 285718, upload-time = "2026-10-02T18:02:54.395Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/e9/bf718a52df1f52b1d45d57cd6e74f27affc548e901e66eae5a315a801aca/tinker-0.34.0-py3-none-any.whl", hash = "sha256:72ee08d865ddc5c43b099aad96526795562536a011596498eb13b92921ba6664", size = 295528, upload-time = "2026-10-17T01:13:25.929Z" },
 ]
 
 [[package]]

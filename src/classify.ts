@@ -137,7 +137,6 @@ Size: ${file.size} bytes
 ${body}`;
 }
 
-/** Lowercase kebab-case, ASCII only. */
 /**
  * Lowercase kebab-case that keeps letters in any script. Accents are dropped
  * (café -> cafe), but Korean, Japanese, and other letters stay: an ASCII-only

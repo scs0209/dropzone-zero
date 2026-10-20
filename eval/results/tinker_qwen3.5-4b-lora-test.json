@@ -1,0 +1,1256 @@
+{
+  "model": "tinker:qwen3.5-4b-lora",
+  "split": "test",
+  "cases": 63,
+  "categoryAccuracy": 1,
+  "dateAccuracy": 1,
+  "invalidRate": 0,
+  "latencyMs": {
+    "p50": 7783,
+    "p95": 15752
+  },
+  "byTag": {
+    "receipt": {
+      "cases": 13,
+      "categoryAccuracy": 1
+    },
+    "korean": {
+      "cases": 9,
+      "categoryAccuracy": 1
+    },
+    "lookalike": {
+      "cases": 9,
+      "categoryAccuracy": 1
+    },
+    "invoice": {
+      "cases": 8,
+      "categoryAccuracy": 1
+    },
+    "two-dates": {
+      "cases": 5,
+      "categoryAccuracy": 1
+    },
+    "statement": {
+      "cases": 4,
+      "categoryAccuracy": 1
+    },
+    "spreadsheet": {
+      "cases": 4,
+      "categoryAccuracy": 1
+    },
+    "booking": {
+      "cases": 6,
+      "categoryAccuracy": 1
+    },
+    "manual": {
+      "cases": 3,
+      "categoryAccuracy": 1
+    },
+    "warranty": {
+      "cases": 3,
+      "categoryAccuracy": 1
+    },
+    "note": {
+      "cases": 4,
+      "categoryAccuracy": 1
+    },
+    "calendar": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "document": {
+      "cases": 6,
+      "categoryAccuracy": 1
+    },
+    "presentation": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "installer": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "no-content": {
+      "cases": 6,
+      "categoryAccuracy": 1
+    },
+    "screenshot": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "photo": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    },
+    "other": {
+      "cases": 2,
+      "categoryAccuracy": 1
+    }
+  },
+  "results": [
+    {
+      "id": "receipt-1",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-12-03"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-12-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7325
+    },
+    {
+      "id": "receipt-4",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-04-25"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-04-25"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6832
+    },
+    {
+      "id": "receipt-7",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-05-19"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-05-19"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6751
+    },
+    {
+      "id": "receipt-10",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-05-27"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-05-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7732
+    },
+    {
+      "id": "receipt-13",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-11-11"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-11-11"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6771
+    },
+    {
+      "id": "receipt-16",
+      "tags": [
+        "receipt"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-01-24"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-01-24"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6767
+    },
+    {
+      "id": "koReceipt-1",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-01-10"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-01-10"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6761
+    },
+    {
+      "id": "koReceipt-4",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2025-05-27"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2025-05-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7753
+    },
+    {
+      "id": "koReceipt-7",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2025-03-12"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2025-03-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7967
+    },
+    {
+      "id": "koReceipt-10",
+      "tags": [
+        "receipt",
+        "korean"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2025-05-07"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2025-05-07"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6756
+    },
+    {
+      "id": "paidInvoice-1",
+      "tags": [
+        "receipt",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-10-13"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-10-13"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7784
+    },
+    {
+      "id": "paidInvoice-4",
+      "tags": [
+        "receipt",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-02-01"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-02-01"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7783
+    },
+    {
+      "id": "paidInvoice-7",
+      "tags": [
+        "receipt",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "receipt",
+        "date": "2026-11-17"
+      },
+      "got": {
+        "category": "receipt",
+        "date": "2026-11-17"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6799
+    },
+    {
+      "id": "invoice-1",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2025-06-22"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2025-06-22"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7860
+    },
+    {
+      "id": "invoice-4",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-01-27"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-01-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8771
+    },
+    {
+      "id": "invoice-7",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-02-12"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-02-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6735
+    },
+    {
+      "id": "invoice-10",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-11-28"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-11-28"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7756
+    },
+    {
+      "id": "invoice-13",
+      "tags": [
+        "invoice",
+        "two-dates"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-10-03"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-10-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7742
+    },
+    {
+      "id": "koInvoice-1",
+      "tags": [
+        "invoice",
+        "korean"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-01-17"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-01-17"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7759
+    },
+    {
+      "id": "koInvoice-4",
+      "tags": [
+        "invoice",
+        "korean"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2026-12-06"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2026-12-06"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6890
+    },
+    {
+      "id": "koInvoice-7",
+      "tags": [
+        "invoice",
+        "korean"
+      ],
+      "expected": {
+        "category": "invoice",
+        "date": "2025-09-26"
+      },
+      "got": {
+        "category": "invoice",
+        "date": "2025-09-26"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6720
+    },
+    {
+      "id": "statement-1",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2026-03-27"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2026-03-27"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7788
+    },
+    {
+      "id": "statement-4",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2026-01-03"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2026-01-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6741
+    },
+    {
+      "id": "statement-7",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2026-10-15"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2026-10-15"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8731
+    },
+    {
+      "id": "statement-10",
+      "tags": [
+        "statement"
+      ],
+      "expected": {
+        "category": "statement",
+        "date": "2025-01-04"
+      },
+      "got": {
+        "category": "statement",
+        "date": "2025-01-04"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 18743
+    },
+    {
+      "id": "spreadsheet-1",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8768
+    },
+    {
+      "id": "spreadsheet-4",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8725
+    },
+    {
+      "id": "spreadsheet-7",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7756
+    },
+    {
+      "id": "spreadsheet-10",
+      "tags": [
+        "spreadsheet",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "got": {
+        "category": "spreadsheet",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6738
+    },
+    {
+      "id": "booking-1",
+      "tags": [
+        "booking",
+        "korean"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-05-06"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-05-06"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7755
+    },
+    {
+      "id": "booking-4",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-09-22"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-09-22"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6724
+    },
+    {
+      "id": "booking-7",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-09-16"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-09-16"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7797
+    },
+    {
+      "id": "booking-10",
+      "tags": [
+        "booking",
+        "korean"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2026-09-12"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2026-09-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6737
+    },
+    {
+      "id": "booking-13",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2026-11-15"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2026-11-15"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7907
+    },
+    {
+      "id": "booking-16",
+      "tags": [
+        "booking"
+      ],
+      "expected": {
+        "category": "booking",
+        "date": "2025-09-01"
+      },
+      "got": {
+        "category": "booking",
+        "date": "2025-09-01"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8832
+    },
+    {
+      "id": "manual-1",
+      "tags": [
+        "manual"
+      ],
+      "expected": {
+        "category": "manual",
+        "date": null
+      },
+      "got": {
+        "category": "manual",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8727
+    },
+    {
+      "id": "manual-4",
+      "tags": [
+        "manual"
+      ],
+      "expected": {
+        "category": "manual",
+        "date": null
+      },
+      "got": {
+        "category": "manual",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 13763
+    },
+    {
+      "id": "manual-7",
+      "tags": [
+        "manual"
+      ],
+      "expected": {
+        "category": "manual",
+        "date": null
+      },
+      "got": {
+        "category": "manual",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8000
+    },
+    {
+      "id": "warranty-1",
+      "tags": [
+        "warranty"
+      ],
+      "expected": {
+        "category": "warranty",
+        "date": "2025-02-21"
+      },
+      "got": {
+        "category": "warranty",
+        "date": "2025-02-21"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8746
+    },
+    {
+      "id": "warranty-4",
+      "tags": [
+        "warranty"
+      ],
+      "expected": {
+        "category": "warranty",
+        "date": "2025-10-08"
+      },
+      "got": {
+        "category": "warranty",
+        "date": "2025-10-08"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 9763
+    },
+    {
+      "id": "warranty-7",
+      "tags": [
+        "warranty"
+      ],
+      "expected": {
+        "category": "warranty",
+        "date": "2026-10-22"
+      },
+      "got": {
+        "category": "warranty",
+        "date": "2026-10-22"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7785
+    },
+    {
+      "id": "note-1",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": "2026-09-28"
+      },
+      "got": {
+        "category": "note",
+        "date": "2026-09-28"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7732
+    },
+    {
+      "id": "note-4",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": "2025-11-11"
+      },
+      "got": {
+        "category": "note",
+        "date": "2025-11-11"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7773
+    },
+    {
+      "id": "note-7",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": null
+      },
+      "got": {
+        "category": "note",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7736
+    },
+    {
+      "id": "note-10",
+      "tags": [
+        "note"
+      ],
+      "expected": {
+        "category": "note",
+        "date": "2026-09-15"
+      },
+      "got": {
+        "category": "note",
+        "date": "2026-09-15"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8722
+    },
+    {
+      "id": "calendar-1",
+      "tags": [
+        "calendar"
+      ],
+      "expected": {
+        "category": "calendar",
+        "date": "2026-01-09"
+      },
+      "got": {
+        "category": "calendar",
+        "date": "2026-01-09"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 15752
+    },
+    {
+      "id": "calendar-4",
+      "tags": [
+        "calendar"
+      ],
+      "expected": {
+        "category": "calendar",
+        "date": "2026-06-26"
+      },
+      "got": {
+        "category": "calendar",
+        "date": "2026-06-26"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 20739
+    },
+    {
+      "id": "document-1",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-02-26"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-02-26"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8734
+    },
+    {
+      "id": "document-4",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-01-04"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-01-04"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8730
+    },
+    {
+      "id": "document-7",
+      "tags": [
+        "document",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-09-14"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-09-14"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7745
+    },
+    {
+      "id": "document-10",
+      "tags": [
+        "document",
+        "lookalike"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-04-13"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-04-13"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 12753
+    },
+    {
+      "id": "document-13",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2026-04-25"
+      },
+      "got": {
+        "category": "document",
+        "date": "2026-04-25"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 15767
+    },
+    {
+      "id": "document-16",
+      "tags": [
+        "document"
+      ],
+      "expected": {
+        "category": "document",
+        "date": "2025-10-12"
+      },
+      "got": {
+        "category": "document",
+        "date": "2025-10-12"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 9714
+    },
+    {
+      "id": "presentation-1",
+      "tags": [
+        "presentation"
+      ],
+      "expected": {
+        "category": "presentation",
+        "date": null
+      },
+      "got": {
+        "category": "presentation",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 10734
+    },
+    {
+      "id": "presentation-4",
+      "tags": [
+        "presentation"
+      ],
+      "expected": {
+        "category": "presentation",
+        "date": null
+      },
+      "got": {
+        "category": "presentation",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7744
+    },
+    {
+      "id": "installer-1",
+      "tags": [
+        "installer",
+        "no-content"
+      ],
+      "expected": {
+        "category": "installer",
+        "date": null
+      },
+      "got": {
+        "category": "installer",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7737
+    },
+    {
+      "id": "installer-4",
+      "tags": [
+        "installer",
+        "no-content"
+      ],
+      "expected": {
+        "category": "installer",
+        "date": null
+      },
+      "got": {
+        "category": "installer",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7729
+    },
+    {
+      "id": "screenshot-1",
+      "tags": [
+        "screenshot",
+        "no-content"
+      ],
+      "expected": {
+        "category": "screenshot",
+        "date": "2026-10-24"
+      },
+      "got": {
+        "category": "screenshot",
+        "date": "2026-10-24"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 9741
+    },
+    {
+      "id": "screenshot-4",
+      "tags": [
+        "screenshot",
+        "no-content"
+      ],
+      "expected": {
+        "category": "screenshot",
+        "date": "2026-07-03"
+      },
+      "got": {
+        "category": "screenshot",
+        "date": "2026-07-03"
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8788
+    },
+    {
+      "id": "photo-1",
+      "tags": [
+        "photo",
+        "no-content"
+      ],
+      "expected": {
+        "category": "photo",
+        "date": null
+      },
+      "got": {
+        "category": "photo",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 6728
+    },
+    {
+      "id": "photo-4",
+      "tags": [
+        "photo",
+        "no-content"
+      ],
+      "expected": {
+        "category": "photo",
+        "date": null
+      },
+      "got": {
+        "category": "photo",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 8758
+    },
+    {
+      "id": "other-1",
+      "tags": [
+        "other"
+      ],
+      "expected": {
+        "category": "other",
+        "date": null
+      },
+      "got": {
+        "category": "other",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 11757
+    },
+    {
+      "id": "other-4",
+      "tags": [
+        "other"
+      ],
+      "expected": {
+        "category": "other",
+        "date": null
+      },
+      "got": {
+        "category": "other",
+        "date": null
+      },
+      "categoryOk": true,
+      "dateOk": true,
+      "invalid": false,
+      "ms": 7728
+    }
+  ],
+  "latencySource": "recorded by ml/finetune.py, one Tinker request at a time"
+}

@@ -48,6 +48,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz status [folder]` | Shows where every file stands: planned, needs review, approved, blocked, executing, verified, failed, or restored |
 | `dz approve [folder] --file <name>` | Releases an item the guard holds for review, for exactly the move shown (`--all` releases every review item) |
 | `dz receipts [folder]` | Reads every receipt and invoice and writes date, vendor, total, currency, and document number to a CSV |
+| `dz eval [--split test]` | Scores the classifier on the synthetic labeled set in `eval/cases.jsonl` (see below) |
 
 `scan` and `preview` take `--json` for machine-readable output; `run` and `undo` take `--yes` to skip the confirmation, and `--temporal` to run as a durable workflow (below). `dz preview --summary` prints only counts and timings, with no file names, so you can share how it did on a real folder without sharing what is in it. The folder defaults to `DZ_INBOX`, then `~/Downloads`.
 
@@ -234,6 +235,22 @@ In testing, a run killed after 15 of 30 files was finished by `dz worker` with 3
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Local Ollama server |
 | `DZ_MODEL` | `gemma4:e4b` | Any Ollama model that supports structured output |
 | `SENTRY_DSN` | unset | Optional error and timing reports, see below |
+
+## Measuring the classifier
+
+`eval/cases.jsonl` holds 180 synthetic downloads with labels (117 to train on, 63 to test with): Korean documents, different date formats, misleading file names, and look-alike categories such as receipt vs invoice. Every vendor, name, and amount is made up, so this set, and only this set, may be sent to a cloud service. `dz eval` runs the test cases through the same prompt, schema check, and date grounding as a real run.
+
+The first run caught a real bug: file names were built ASCII-only, so every Korean title came out empty and those files landed in "other". After the fix, category accuracy went from 85.7% to 98.4%.
+
+As a control, a similar-size open model was fine-tuned on the 117 training cases with [Tinker](https://thinkingmachines.ai/tinker/) (LoRA, rank 16, 3 epochs; `ml/finetune.py`). Tinker does not offer Gemma, so this does not change the app's model; it asks whether fine-tuning is worth doing at all. Its replies are scored by the same pipeline with `dz eval --provider replay`.
+
+| Model (63 test cases) | Category | Date | Invalid | p50 latency |
+|---|---|---|---|---|
+| Gemma 4 e4b, local (Ollama, the app's model) | 98.4% | 100% | 0% | 3.5 s |
+| Qwen3.5-4B on Tinker, untrained | 100% | 92.1% | 0% | 7.8 s |
+| Qwen3.5-4B on Tinker, LoRA on the 117 training cases | 100% | 100% | 0% | 7.8 s |
+
+What this says: fine-tuning fixed the base model's date misses (it picked a transaction date over the statement date, and missed dates on screenshots) and taught it to stop after the JSON (replies went from 282 to 150 characters on average). But local Gemma, untuned, is already at 98.4% with one miss (a paid invoice read as an invoice instead of a receipt), so there is little left to win, and the cloud models are slower because of the round trip. The bigger lesson is about the test set: three models scoring 98 to 100% means it is too easy to tell them apart. Harder cases (scans without a text layer, mixed-language documents, near-duplicate categories) come before any fine-tuning of Gemma itself.
 
 ## Telemetry
 

@@ -6,7 +6,7 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "tabpfn==9.1.0",
     # Fine-tuning on the synthetic eval set (dz eval / Tinker); only synthetic data is sent.
-    "tinker==0.32.0",
+    "tinker==0.34.0",
 ]
 
 [tool.uv]

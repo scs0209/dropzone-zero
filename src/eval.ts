@@ -85,6 +85,41 @@ export function summarizeResults(model: string, split: string, results: CaseResu
   };
 }
 
+export interface RecordedReply {
+  id: string;
+  prompt: string;
+  raw: string;
+  ms: number;
+}
+
+/**
+ * Plays back replies recorded elsewhere (ml/finetune.py samples a Tinker model),
+ * so they are scored by the same parsing and date grounding as a live model.
+ * A prompt with no recording gets an empty reply, which scores as invalid.
+ */
+export class ReplayClient implements ModelClient {
+  private readonly byPrompt: Map<string, RecordedReply>;
+
+  constructor(replies: RecordedReply[]) {
+    this.byPrompt = new Map(replies.map((r) => [r.prompt, r]));
+  }
+
+  static async load(path: string): Promise<ReplayClient> {
+    const lines = (await readFile(path, "utf8")).split("\n").filter(Boolean);
+    return new ReplayClient(lines.map((line) => JSON.parse(line) as RecordedReply));
+  }
+
+  async generate(prompt: string): Promise<string> {
+    return this.byPrompt.get(prompt)?.raw ?? "";
+  }
+
+  /** The latency measured when the reply was recorded. */
+  recordedMs(id: string): number | undefined {
+    for (const r of this.byPrompt.values()) if (r.id === id) return r.ms;
+    return undefined;
+  }
+}
+
 export async function runEval(
   client: ModelClient,
   model: string,

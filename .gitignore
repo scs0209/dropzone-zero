@@ -18,6 +18,8 @@ demo/
 
 # Python environment for the local TabPFN review gate (ml/)
 ml/.venv/
+# Fine-tuning pairs, rebuilt from eval/cases.jsonl by scripts/export-sft.ts
+ml/data/
 __pycache__/
 
 # Tauri build output for the Zee app
