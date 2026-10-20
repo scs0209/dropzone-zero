@@ -184,6 +184,36 @@ tauriWindow?.onMoved(({ payload }) => {
 
 restorePosition();
 
+// Resize from the top-left handle; Zee and the bubble scale with the window (see --zee-size).
+const SIZE_KEY = "zee-size";
+$("resize").addEventListener("mousedown", (event) => {
+  if (event.button === 0) tauriWindow?.startResizeDragging("NorthWest");
+});
+
+async function restoreSize() {
+  if (!tauriWindow) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZE_KEY) ?? "null");
+    if (saved) await tauriWindow.setSize(new window.__TAURI__.dpi.PhysicalSize(saved.width, saved.height));
+  } catch {
+    // Keep the default size.
+  }
+}
+
+let sizeTimer;
+tauriWindow?.onResized(({ payload }) => {
+  clearTimeout(sizeTimer);
+  sizeTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(SIZE_KEY, JSON.stringify({ width: payload.width, height: payload.height }));
+    } catch {
+      // Not saved; Zee opens at the default size next time.
+    }
+  }, 300);
+});
+
+restoreSize();
+
 $("undo").addEventListener("click", async () => {
   if (!confirm("Put back everything the last run moved?")) return;
   try {
