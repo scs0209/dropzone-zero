@@ -1,15 +1,16 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-// `dz autostart`: starts `dz daemon` (the watcher plus the local API) at login
-// through a macOS LaunchAgent, the standard per-user mechanism (a plist in
-// ~/Library/LaunchAgents, loaded by launchctl), and, if Zee.app has been built,
-// opens Zee too. Disabling unloads both and deletes the plists; nothing else changes.
+// `dz autostart`: starts Dropzone Zero at login through a macOS LaunchAgent, the
+// standard per-user mechanism (a plist in ~/Library/LaunchAgents, loaded by
+// launchctl). With Zee built, Zee is the only login item and starts Ollama and
+// the daemon itself; without it, the daemon is started directly. Disabling
+// unloads whatever is registered and deletes the plists; nothing else changes.
 
 const run = promisify(execFile);
 
@@ -126,22 +127,32 @@ async function unload(label: string): Promise<void> {
   }
 }
 
-export async function enableAutostart(folder: string): Promise<AutostartPaths & { zee: boolean }> {
+export interface EnableResult extends AutostartPaths {
+  /** "zee": Zee.app is the login item and runs the rest. "daemon": the daemon is the login item. */
+  mode: "zee" | "daemon";
+}
+
+export async function enableAutostart(folder: string): Promise<EnableResult> {
   assertMac();
   const paths = autostartPaths();
   await mkdir(dirname(paths.plist), { recursive: true });
   await mkdir(dirname(paths.log), { recursive: true });
+  // Zee watches ~/Downloads; another folder keeps the daemon as the login item.
+  const zee = existsSync(paths.zeeApp) && resolve(folder) === join(homedir(), "Downloads");
+  if (zee) {
+    // One login item: Zee. A separately registered daemon would only race it for the lock.
+    await unload(LABEL);
+    await rm(paths.plist, { force: true });
+    await writeFile(paths.zeePlist, buildZeePlist(paths));
+    await unload(ZEE_LABEL);
+    await run("launchctl", ["bootstrap", domain(), paths.zeePlist]);
+    return { ...paths, mode: "zee" };
+  }
   await writeFile(paths.plist, buildPlist(folder, paths));
   // Replace a previous registration, if any, so the new settings take effect now.
   await unload(LABEL);
   await run("launchctl", ["bootstrap", domain(), paths.plist]);
-  const zee = existsSync(paths.zeeApp);
-  if (zee) {
-    await writeFile(paths.zeePlist, buildZeePlist(paths));
-    await unload(ZEE_LABEL);
-    await run("launchctl", ["bootstrap", domain(), paths.zeePlist]);
-  }
-  return { ...paths, zee };
+  return { ...paths, mode: "daemon" };
 }
 
 export async function disableAutostart(): Promise<boolean> {
@@ -156,21 +167,21 @@ export async function disableAutostart(): Promise<boolean> {
 }
 
 export interface AutostartStatus {
-  installed: boolean;
-  running: boolean;
-  pid?: number;
+  mode: "zee" | "daemon" | null;
+  /** The daemon's process, wherever it was started from. */
+  daemonPid?: number;
   log: string;
 }
 
 export async function autostartStatus(): Promise<AutostartStatus> {
   assertMac();
   const paths = autostartPaths();
-  const installed = existsSync(paths.plist);
+  const mode = existsSync(paths.zeePlist) ? "zee" : existsSync(paths.plist) ? "daemon" : null;
   try {
-    const { stdout } = await run("launchctl", ["print", `${domain()}/${LABEL}`]);
-    const pid = /\bpid = (\d+)/.exec(stdout)?.[1];
-    return { installed, running: /\bstate = running\b/.test(stdout), ...(pid ? { pid: Number(pid) } : {}), log: paths.log };
+    const info = JSON.parse(await readFile(join(homedir(), ".dropzone-zero", "daemon.json"), "utf8")) as { pid: number };
+    process.kill(info.pid, 0);
+    return { mode, daemonPid: info.pid, log: paths.log };
   } catch {
-    return { installed, running: false, log: paths.log };
+    return { mode, log: paths.log };
   }
 }

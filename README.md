@@ -43,7 +43,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
 | `dz watch [folder] [--auto]` | Keeps planning as files arrive. With `--auto`, allowed moves run on their own; review and blocked items still wait |
 | `dz daemon [folder]` | The watcher plus a local API (127.0.0.1, token-protected) for the Zee desktop app |
-| `dz autostart enable [folder]` | Starts the daemon, and Zee if built, at every login (macOS LaunchAgents); `disable` removes them, `status` shows whether it is running |
+| `dz autostart enable [folder]` | Starts Dropzone Zero at every login (macOS LaunchAgent): Zee, which runs the rest, if built; otherwise the daemon. `disable` removes it, `status` shows what is running |
 | `dz recent [folder] [--reveal]` | Lists what moved where, newest first; `--reveal` opens the latest file (or `--file <name>`) in Finder |
 | `dz status [folder]` | Shows where every file stands: planned, needs review, approved, blocked, executing, verified, failed, or restored |
 | `dz approve [folder] --file <name>` | Releases an item the guard holds for review, for exactly the move shown (`--all` releases every review item) |
@@ -154,9 +154,11 @@ Drag Zee anywhere on the screen; resize the speech bubble from its top-left corn
 
 ```bash
 pnpm app:build                        # builds Zee.app (about 10 MB) with Tauri
-pnpm dz autostart enable ~/Downloads   # daemon and Zee start now and at every login
+pnpm dz autostart enable ~/Downloads   # Zee starts now and at every login
 pnpm app                              # or run Zee in development mode
 ```
+
+Zee is the only thing that has to be launched. When it starts, it starts Ollama and `dz daemon` if they are not already running (an Ollama you run yourself, say with `brew services`, is used as is), and when you quit Zee from its menu bar icon it stops what it started. If the daemon is not running, Zee's bubble shows a **Start** button.
 
 Zee is a [Tauri](https://tauri.app) app: a Rust shell around the system WebView, so it is about 10 MB instead of shipping a browser. The robot is built from simple shapes in [three.js](https://threejs.org) (pinned, copied into the app at build time, no CDN) and renders at 30 frames per second when active and 12 when resting, so an always-on companion stays cheap. It never touches files. It talks to `dz daemon` over `127.0.0.1` with a random token that only your user can read (`~/.dropzone-zero/daemon.json`, mode 600), and the daemon refuses requests from any other web origin. Every click goes through the same guard and executor as the command line: **Move it** can only release a review item, and **Show in Finder** only opens files Dropzone Zero itself moved.
 

@@ -1,14 +1,19 @@
 // Zee: a small always-on-top character for Dropzone Zero. The window only draws
 // the character and passes clicks to the local `dz daemon`; all file work stays
-// in the daemon, behind the same guardrails as the command line.
+// in the daemon, behind the same guardrails as the command line. Zee also starts
+// the daemon and Ollama when they are not running, and stops them when it quits
+// (see services.rs), so Zee is the only thing that has to be launched.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod services;
 
 use std::sync::Mutex;
 
+use services::Services;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, Wry};
+use tauri::{AppHandle, Manager, RunEvent, State, Wry};
 
 const WIDTH: f64 = 300.0;
 const HEIGHT: f64 = 380.0;
@@ -19,12 +24,21 @@ struct ToggleItem(Mutex<MenuItem<Wry>>);
 
 /// The daemon's port and token, written by `dz daemon` to a file only this user can read.
 #[tauri::command]
-fn daemon_info() -> Result<String, String> {
+fn daemon_info(services: State<Services>) -> Result<String, String> {
+    if services.starting() {
+        return Err("Starting Dropzone Zero...".to_string());
+    }
     let home = std::env::var("HOME").map_err(|e| e.to_string())?;
-    std::fs::read_to_string(format!("{home}/.dropzone-zero/daemon.json")).map_err(|_| {
-        "The Dropzone Zero daemon is not running. Start it with `pnpm dz daemon` or `pnpm dz autostart enable`."
-            .to_string()
-    })
+    std::fs::read_to_string(format!("{home}/.dropzone-zero/daemon.json"))
+        .ok()
+        .filter(|_| services::daemon_reachable())
+        .ok_or_else(|| "Dropzone Zero is not running. Click Start to start it.".to_string())
+}
+
+/// Starts Ollama and the daemon if they are not running (the bubble's Start button).
+#[tauri::command]
+fn start_services(services: State<Services>) -> Result<(), String> {
+    services.ensure()
 }
 
 /// Shows or hides Zee and keeps the menu bar item's label in step.
@@ -57,9 +71,18 @@ fn toggle(app: &AppHandle) {
 }
 
 fn main() {
-    tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![daemon_info, set_zee_visible, set_attention])
+    let app = tauri::Builder::default()
+        .manage(Services::default())
+        .invoke_handler(tauri::generate_handler![daemon_info, start_services, set_zee_visible, set_attention])
         .setup(|app| {
+            // Bring up what Zee needs without holding up the window.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if let Err(error) = handle.state::<Services>().ensure() {
+                    eprintln!("{error}");
+                }
+            });
+
             // A companion, not an app window: no Dock icon. The menu bar icon brings Zee back.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -105,6 +128,13 @@ fn main() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Zee");
+        .build(tauri::generate_context!())
+        .expect("error while building Zee");
+
+    // Quitting Zee stops what Zee started, so nothing keeps running in the background.
+    app.run(|app, event| {
+        if let RunEvent::Exit = event {
+            app.state::<Services>().stop();
+        }
+    });
 }

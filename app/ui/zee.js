@@ -50,6 +50,8 @@ function setAttention(count) {
 
 function render(state) {
   setAttention(state.pending.length);
+  $("start").hidden = true;
+  lastError = "";
   setMood(state.mood);
   $("badge").textContent = state.mood === "asking" ? String(state.pending.length) : $("badge").textContent;
   $("message").textContent = state.message;
@@ -113,10 +115,17 @@ function drawRecent(recent) {
   );
 }
 
+let lastError = "";
 function showError(error) {
-  setMood("dizzy");
-  $("message").textContent = error instanceof Error ? error.message : String(error);
-  setBubbleOpen(true);
+  const text = error instanceof Error ? error.message : String(error);
+  // While Zee is bringing up Ollama and the daemon, look busy rather than broken.
+  const starting = text.startsWith("Starting");
+  setMood(starting ? "thinking" : "dizzy");
+  $("message").textContent = text;
+  $("start").hidden = starting || !window.__TAURI__ || !/not running/i.test(text);
+  // Open the bubble once per new problem; if the person closes it, leave it closed.
+  if (!starting && text !== lastError) setBubbleOpen(true);
+  lastError = text;
 }
 
 async function decide(id, approve, buttons) {
@@ -308,6 +317,16 @@ async function restoreWindow() {
 }
 
 restoreWindow();
+
+$("start").addEventListener("click", async () => {
+  $("start").hidden = true;
+  showError("Starting Dropzone Zero...");
+  try {
+    await window.__TAURI__.core.invoke("start_services");
+  } catch (error) {
+    showError(error);
+  }
+});
 
 $("hide").addEventListener("click", () => {
   setBubbleOpen(false);

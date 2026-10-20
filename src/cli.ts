@@ -476,15 +476,18 @@ async function autostart(action: string | undefined, folderArg: string | undefin
   const { autostartStatus, disableAutostart, enableAutostart } = await import("./autostart.js");
   if (action === "enable") {
     const folder = resolve(expandHome(folderArg ?? process.env.DZ_INBOX ?? "~/Downloads"));
-    const paths = await enableAutostart(folder);
-    console.log(`The Dropzone Zero daemon now starts at login for ${folder}, and is running now.`);
-    console.log(`  LaunchAgent: ${paths.plist}`);
-    console.log(`  Log:         ${paths.log}`);
-    console.log(
-      paths.zee
-        ? "Zee starts at login too; click Zee to answer questions and see what moved."
-        : "Build Zee with `pnpm app:build` and run this again to start Zee at login too; until then, use notifications and `dz status`.",
-    );
+    const result = await enableAutostart(folder);
+    if (result.mode === "zee") {
+      console.log("Zee now starts at login, and starts Ollama and the Dropzone Zero daemon itself.");
+      console.log(`  LaunchAgent: ${result.zeePlist}`);
+      console.log(`  Logs:        ${dirname(result.log)}`);
+      console.log("Quitting Zee from its menu bar icon stops what it started.");
+    } else {
+      console.log(`The Dropzone Zero daemon now starts at login for ${folder}, and is running now.`);
+      console.log(`  LaunchAgent: ${result.plist}`);
+      console.log(`  Log:         ${result.log}`);
+      console.log("Build Zee with `pnpm app:build` and run this again to have Zee start everything instead.");
+    }
     console.log("If macOS asks whether node may access your Downloads folder, allow it, or the watcher cannot read it.");
     return;
   }
@@ -495,12 +498,11 @@ async function autostart(action: string | undefined, folderArg: string | undefin
   }
   if (action === "status") {
     const status = await autostartStatus();
-    if (!status.installed) {
-      console.log("Autostart is off. Turn it on with `dz autostart enable`.");
-      return;
-    }
-    console.log(`Autostart is on; the watcher is ${status.running ? `running (pid ${status.pid})` : "not running right now"}.`);
-    console.log(`  Log: ${status.log}`);
+    const login =
+      status.mode === "zee" ? "Zee starts at login and runs the rest" : status.mode === "daemon" ? "the daemon starts at login" : "nothing starts at login";
+    console.log(`Autostart: ${login}.`);
+    console.log(`Daemon: ${status.daemonPid ? `running (pid ${status.daemonPid})` : "not running"}.`);
+    console.log(`  Logs: ${dirname(status.log)}`);
     return;
   }
   throw new Error("Usage: dz autostart enable [folder] | disable | status");

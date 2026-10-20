@@ -13,3 +13,5 @@ tauri-build = { version = "=2.7.1", features = [] }
 # macos-private-api: a transparent window on macOS. tray-icon and image-png: the
 # menu bar icon that shows and hides Zee.
 tauri = { version = "=2.12.1", features = ["macos-private-api", "tray-icon", "image-png"] }
+# Reading the daemon's info file (already in the tree through tauri).
+serde_json = "1"
