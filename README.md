@@ -173,8 +173,6 @@ Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves,
 - [x] Run and undo as a durable Temporal workflow, so a crash or reboot resumes where it stopped
 - [x] Guardrail engine with ALLOW / REVIEW / BLOCK verdicts, checked again by the executor
 - [x] `dz watch` with `--auto` for allowed moves only
-- [ ] Batch approval on your phone through Auth0 for AI Agents (asynchronous authorization), showing counts only
-- [ ] Read-only dashboard of the synthetic demo, deployed on Render
 - [x] Gemma vision for photos and screenshots (Ollama's `images` field)
 - [ ] Vision for scanned PDFs that have no text layer (render the first page to an image)
 - [ ] [Mastra](https://mastra.ai) agent wrapper. Not added yet: today the classifier is one structured call per file with no tools, and Mastra's agent would need an extra AI SDK provider for Ollama to do the same thing. It becomes worthwhile once the agent has tools to call (journal lookups, receipt-to-CSV, calendar follow-ups).
