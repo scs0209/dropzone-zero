@@ -34,6 +34,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 
 | Command | What it does |
 |---|---|
+| `dz tidy [folder]` | The whole routine in one go: analyze, plan, ask you about each review item, confirm, then move (a Mastra workflow) |
 | `dz scan [folder]` | Lists files with size, age, hash, and flags (partial download, empty, duplicate) |
 | `dz preview [folder]` | Plans a new name and folder for every file with the local model and saves the plan. Nothing moves |
 | `dz run [folder]` | Carries out the saved plan after you confirm, verifying each file by hash before and after it moves |
@@ -72,6 +73,21 @@ The executor does not trust the plan file either. Right before each rename it ju
 Runs of more than 20 allowed moves (`DZ_BULK_LIMIT`) are reported as bulk changes, which is where a second approval step plugs in.
 
 Each file moves through explicit states: `planned` or `needs-review` → `approved` → `executing` → `verified` (or `failed`), and `restored` after an undo; `blocked` never moves. The states are replayed from the saved plan and the append-only journal rather than stored separately, so they cannot drift from what actually happened. A file left in `executing` means a run stopped between the rename and its check, and `dz status` says how to finish or reverse it.
+
+## One command: `dz tidy`, a Mastra workflow
+
+`dz tidy` runs analyze → plan → approve → move as a [Mastra](https://mastra.ai) workflow. The approve step suspends the run: you see the plan table, answer y or n for each item the guard holds for review, and confirm; the workflow then resumes with your answers and moves only what is allowed or approved.
+
+```text
+2 items need your decision:
+  Move Notely-4.2.1.dmg -> Installers/notely-4-2-1-installer.dmg? (Program or installer) [y/N] y
+  Move SlothPlayer-setup.pkg -> Installers/slothplayer-setup-package.pkg? (Program or installer) [y/N] n
+
+Move 29 files now? [y/N] y
+Run 20261020T023758879Z: moved 29 files, every one verified by SHA-256. `dz undo` puts them back.
+```
+
+Mastra orchestrates the steps; it never gets a say in what may happen to a file. Each step calls Dropzone Zero's own functions, no step hands the model a tool, and approving can only release review items: blocked items stay blocked because the executor judges every item again. Mastra's own usage telemetry (which reports to PostHog by default) is switched off before Mastra loads, the version is pinned, and the install was checked against the June 2026 `@mastra` npm compromise (pnpm 10 does not run dependency install scripts, which is how that attack spread).
 
 ## Watching the folder
 
@@ -175,7 +191,7 @@ Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves,
 - [x] `dz watch` with `--auto` for allowed moves only
 - [x] Gemma vision for photos and screenshots (Ollama's `images` field)
 - [ ] Vision for scanned PDFs that have no text layer (render the first page to an image)
-- [ ] [Mastra](https://mastra.ai) agent wrapper. Not added yet: today the classifier is one structured call per file with no tools, and Mastra's agent would need an extra AI SDK provider for Ollama to do the same thing. It becomes worthwhile once the agent has tools to call (journal lookups, receipt-to-CSV, calendar follow-ups).
+- [x] `dz tidy` as a Mastra workflow with a suspend/resume approval step
 
 ## Demo data
 

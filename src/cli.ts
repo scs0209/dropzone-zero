@@ -33,6 +33,7 @@ import { captureError, flushTelemetry, initTelemetry, recordCounts, recordDurati
 const USAGE = `Dropzone Zero - keeps your Downloads folder tidy, with every move reversible.
 
 Usage:
+  dz tidy [folder] [--yes]       Analyze, plan, ask you, then move: the whole routine in one go
   dz scan [folder] [--json]      List files with size, age, hash, and flags
   dz preview [folder] [--json | --summary]
                                  Plan new names and folders with a local model (moves nothing)
@@ -94,7 +95,7 @@ function itemNote(item: PlanItem): string {
   return `  (${approved}${item.checks.join("; ")})`;
 }
 
-function printPlan(plan: PlanItem[], folder: string, gate: GateResult): void {
+function printPlan(plan: PlanItem[], folder: string, gate: GateResult, hints = true): void {
   const counts = summarize(plan);
   console.log(`Plan for ${plan.length} files in ${folder} (preview only, nothing was moved)\n`);
   console.log(["VERDICT", "ACTION".padEnd(10), "CONF", "CATEGORY".padEnd(12), "FILE".padEnd(38), "NEW PATH"].join("  "));
@@ -121,7 +122,9 @@ function printPlan(plan: PlanItem[], folder: string, gate: GateResult): void {
   const verdicts = countVerdicts(plan);
   console.log(`\n${verdicts.allow} allowed, ${verdicts.review} waiting for review, ${verdicts.block} blocked (${counts.move} moves, ${counts.quarantine} to quarantine).`);
   console.log(`Review gate: ${gate.status === "on" ? `${gate.flagged} sent to review, ` : ""}${gate.note}.`);
-  console.log("`dz run` carries out the allowed items; `dz approve --file <name>` releases a review item; `dz undo` reverses a run.");
+  if (hints) {
+    console.log("`dz run` carries out the allowed items; `dz approve --file <name>` releases a review item; `dz undo` reverses a run.");
+  }
 }
 
 function countVerdicts(plan: PlanItem[]): Record<"allow" | "review" | "block", number> {
@@ -207,6 +210,54 @@ async function confirm(question: string, yes: boolean): Promise<boolean> {
   const answer = await rl.question(`${question} [y/N] `);
   rl.close();
   return /^y(es)?$/i.test(answer.trim());
+}
+
+/**
+ * The whole routine in one command, as a Mastra workflow: analyze, plan, then
+ * wait (the workflow suspends) while the person reviews the plan, releases
+ * review items one by one, and confirms; then move.
+ */
+async function tidy(folder: string, yes: boolean): Promise<void> {
+  const client = new OllamaClient();
+  await client.ensureReady();
+  const { startTidy } = await import("./tidy.js");
+  const session = await startTidy({
+    inbox: folder,
+    model: client.model,
+    classify: async (file) => classifyFile(client, file, await extractContent(file)),
+    onProgress: (done, total) => {
+      if (process.stderr.isTTY) process.stderr.write(`\rPlanning ${done}/${total}...`);
+    },
+  });
+  if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
+  printPlan(session.items, folder, { status: "off", note: session.gate, flagged: 0 }, false);
+
+  const interactive = process.stdin.isTTY && !yes;
+  const approve: string[] = [];
+  let confirmed = yes;
+  if (interactive) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const ask = async (question: string) => /^y(es)?$/i.test((await rl.question(`${question} [y/N] `)).trim());
+    const reviews = session.items.filter((item) => item.verdict === "review");
+    if (reviews.length) console.log(`\n${reviews.length} ${reviews.length === 1 ? "item needs" : "items need"} your decision:`);
+    for (const item of reviews) {
+      if (await ask(`  Move ${item.name} -> ${item.target}? (${item.checks.join("; ")})`)) approve.push(item.name);
+    }
+    const runnable = session.items.filter((item) => item.verdict === "allow").length + approve.length;
+    confirmed = runnable > 0 && (await ask(`\nMove ${runnable} files now?`));
+    rl.close();
+  } else if (!yes) {
+    process.stderr.write("Not a terminal; pass --yes to run the allowed moves (review items stay).\n");
+  }
+
+  const { cancelled, result } = await session.decide({ approve, confirmed });
+  if (cancelled || !result) {
+    console.log("Nothing was moved. The plan is saved; `dz approve` and `dz run` can pick it up later.");
+    return;
+  }
+  recordCounts("dz.tidy", { moved: result.moved, approved: approve.length, failed: result.failed.length });
+  console.log(`Run ${result.run}: moved ${result.moved} files, every one verified by SHA-256. \`dz undo\` puts them back.`);
+  printFailures(result.failed);
 }
 
 function printFailures(failed: { name: string; error: string }[]): void {
@@ -479,6 +530,7 @@ async function main(): Promise<void> {
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
   if (command === "status") return status(folder, json);
+  if (command === "tidy") return tidy(folder, values.yes ?? false);
   if (command === "watch") return watchFolder(folder, values.auto ?? false);
   if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
   if (command === "receipts") return receipts(folder, values.out);

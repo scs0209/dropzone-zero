@@ -25,6 +25,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "@mastra/core": "1.74.0",
     "@sentry/node": "11.4.0",
     "@temporalio/activity": "1.24.0",
     "@temporalio/client": "1.24.0",
