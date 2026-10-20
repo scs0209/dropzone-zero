@@ -71,8 +71,9 @@ for (const x of [-0.45, 0.45]) {
 
 const arm = mesh(new THREE.CapsuleGeometry(0.12, 0.5, 6, 12), trimMat, 1.15, 0.25, 0.2);
 head.add(arm);
+// The page Zee eats lives on the head, so it always lands in the mouth, wherever the head is turned.
 const page = mesh(new RoundedBoxGeometry(0.4, 0.52, 0.04, 2, 0.02), clay(0xffffff));
-robot.add(page);
+head.add(page);
 
 const shadow = mesh(new THREE.CircleGeometry(1.0, 48), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.14 }), 0, -0.6, 0);
 shadow.rotation.x = -Math.PI / 2;
@@ -121,12 +122,14 @@ function frame() {
   const resting = mood === "sleeping" || mood === "paused";
   robot.position.y = mood === "paused" ? 0 : Math.sin(t * (resting ? 1.6 : 3)) * (resting ? 0.03 : 0.05);
 
-  const lookX = resting ? 0 : pointer.x * 0.5;
-  const lookY = resting ? -0.12 : -pointer.y * 0.25;
+  // Eating: face a little toward the upper right, where the page comes from, not the pointer.
+  const eating = mood === "eating";
+  const lookX = resting ? 0 : eating ? 0.22 : pointer.x * 0.5;
+  const lookY = resting ? -0.12 : eating ? -0.06 : -pointer.y * 0.25;
   head.rotation.y += (lookX - head.rotation.y) * 0.12;
   head.rotation.x += (lookY - head.rotation.x) * 0.12;
   head.rotation.z = mood === "dizzy" ? Math.sin(t * 4) * 0.18 : head.rotation.z * 0.8;
-  robot.rotation.y += ((resting ? Math.sin(t * 0.4) * 0.2 : pointer.x * 0.2) - robot.rotation.y) * 0.06;
+  robot.rotation.y += ((resting ? Math.sin(t * 0.4) * 0.2 : eating ? 0.08 : pointer.x * 0.2) - robot.rotation.y) * 0.06;
 
   const blink = t % 3.4 < 0.12;
   const thinking = mood === "thinking";
@@ -149,8 +152,10 @@ function frame() {
   page.visible = mood === "eating";
   if (page.visible) {
     const p = (t * 0.9) % 1;
-    // From the upper right straight into the mouth.
-    page.position.set(1.6 - p * 1.6, 2.2 - p * (2.2 - (0.95 + MOUTH_Y)), 0.6 + p * 0.25);
+    // In the head's own space: drops from the upper right to mouth height first,
+    // then slides straight in, so it never crosses the eyes.
+    const q = 1 - p;
+    page.position.set(1.4 * q, MOUTH_Y + 1.3 * q * q * q, FACE_Z + 0.08 + 0.45 * q);
     page.rotation.z = p * 3;
     page.scale.setScalar(1 - p * 0.7);
     head.scale.y = 1 + Math.sin(t * 18) * 0.04;
