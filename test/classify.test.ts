@@ -17,6 +17,7 @@ function file(name: string, overrides: Partial<ScannedFile> = {}): ScannedFile {
     ageDays: 6,
     sha256: "0".repeat(64),
     partial: false,
+    executable: false,
     ...overrides,
   };
 }

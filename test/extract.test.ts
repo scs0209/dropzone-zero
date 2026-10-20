@@ -111,6 +111,7 @@ describe("vision", () => {
     ageDays: 9,
     sha256: "0".repeat(64),
     partial: false,
+    executable: false,
   };
   const answer = JSON.stringify({
     category: "receipt",
@@ -153,7 +154,7 @@ describe("vision fallback", () => {
     };
     const file: ScannedFile = {
       name: "IMG_9001.jpg", path: "/inbox/IMG_9001.jpg", ext: ".jpg", size: 10, modifiedAt: new Date("2026-10-01T00:00:00Z"),
-      ageDays: 19, sha256: "0".repeat(64), partial: false,
+      ageDays: 19, sha256: "0".repeat(64), partial: false, executable: false,
     };
     const result = await classifyFile(client, file, { kind: "image", text: "", truncated: false, image: "eA==" });
     assert.deepEqual(calls, [["eA=="], undefined]);

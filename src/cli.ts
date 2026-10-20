@@ -7,6 +7,7 @@ import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
 import {
+  approveItems,
   executePlan,
   lastUndoableRun,
   loadPlan,
@@ -18,6 +19,7 @@ import {
   type UndoResult,
 } from "./execute.js";
 import { contentKindOf, extractContent } from "./extract.js";
+import { batchNeedsApproval, DEFAULT_BULK_LIMIT, isRunnable } from "./guard.js";
 import { newRunId } from "./journal.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
@@ -38,6 +40,8 @@ Usage:
                                  Put back everything the last run moved
   dz undo [folder] --file <name> [--file <name> ...]
                                  Put back single files; the review gate learns from it
+  dz approve [folder] --file <name> | --all
+                                 Release items the guard holds for review
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
                                  Export vendor, date, and total of receipts and invoices to CSV
@@ -53,6 +57,7 @@ Environment:
   OLLAMA_HOST   Ollama server (default http://127.0.0.1:11434)
   DZ_MODEL      Ollama model (default gemma4:e4b)
   DZ_REVIEW_GATE  Set to "off" to skip the local TabPFN review gate
+  DZ_BULK_LIMIT   Allowed moves above this count as a bulk change (default 20)
   TEMPORAL_ADDRESS  Temporal server for --temporal (default 127.0.0.1:7233)
   SENTRY_DSN    Optional; sends only aggregate counts and timings
 `;
@@ -75,18 +80,32 @@ function flagsOf(file: ScannedFile): string {
   return flags.join(", ");
 }
 
+const VERDICT_ORDER = { allow: 0, review: 1, block: 2 } as const;
 const ACTION_ORDER = { move: 0, quarantine: 1, skip: 2 } as const;
+
+/** What a person needs to know about an item that is not simply allowed. */
+function itemNote(item: PlanItem): string {
+  if (item.verdict === "allow") return item.action === "quarantine" ? `  (${item.reason})` : "";
+  const approved = item.verdict === "review" && isRunnable(item) ? "approved: " : "";
+  return `  (${approved}${item.checks.join("; ")})`;
+}
 
 function printPlan(plan: PlanItem[], folder: string, gate: GateResult): void {
   const counts = summarize(plan);
   console.log(`Plan for ${plan.length} files in ${folder} (preview only, nothing was moved)\n`);
-  console.log(["ACTION".padEnd(10), "CONF", "CATEGORY".padEnd(12), "FILE".padEnd(38), "NEW PATH"].join("  "));
-  const sorted = [...plan].sort((a, b) => ACTION_ORDER[a.action] - ACTION_ORDER[b.action] || a.name.localeCompare(b.name));
+  console.log(["VERDICT", "ACTION".padEnd(10), "CONF", "CATEGORY".padEnd(12), "FILE".padEnd(38), "NEW PATH"].join("  "));
+  const sorted = [...plan].sort(
+    (a, b) =>
+      VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict] ||
+      ACTION_ORDER[a.action] - ACTION_ORDER[b.action] ||
+      a.name.localeCompare(b.name),
+  );
   for (const item of sorted) {
-    const destination = item.target ? `-> ${item.target}` : "";
-    const note = item.action === "move" ? "" : `  (${item.reason})`;
+    const destination = item.target && item.verdict !== "block" ? `-> ${item.target}` : "";
+    const note = itemNote(item);
     console.log(
       [
+        item.verdict.toUpperCase().padEnd(7),
         item.action.padEnd(10),
         item.confidence.toFixed(2),
         (item.category ?? "-").padEnd(12),
@@ -95,9 +114,16 @@ function printPlan(plan: PlanItem[], folder: string, gate: GateResult): void {
       ].join("  "),
     );
   }
-  console.log(`\n${counts.move} to move, ${counts.quarantine} to quarantine, ${counts.skip} to skip.`);
-  console.log(`Review gate: ${gate.status === "on" ? `${gate.flagged} held for review, ` : ""}${gate.note}.`);
-  console.log("Run `dz run` to carry out this plan; `dz undo` reverses it.");
+  const verdicts = countVerdicts(plan);
+  console.log(`\n${verdicts.allow} allowed, ${verdicts.review} waiting for review, ${verdicts.block} blocked (${counts.move} moves, ${counts.quarantine} to quarantine).`);
+  console.log(`Review gate: ${gate.status === "on" ? `${gate.flagged} sent to review, ` : ""}${gate.note}.`);
+  console.log("`dz run` carries out the allowed items; `dz approve --file <name>` releases a review item; `dz undo` reverses a run.");
+}
+
+function countVerdicts(plan: PlanItem[]): Record<"allow" | "review" | "block", number> {
+  const counts = { allow: 0, review: 0, block: 0 };
+  for (const item of plan) counts[item.verdict]++;
+  return counts;
 }
 
 function countBy<T>(items: T[], key: (item: T) => string): string {
@@ -115,13 +141,16 @@ function printSummary(plan: PlanItem[], seconds: number, gate: GateResult): void
   const modelCalls = plan.filter((item) => item.source !== "rule").length;
   const band = (c: number) => (c < 0.5 ? "under 0.5" : c < 0.8 ? "0.5-0.8" : "0.8+");
   console.log(`Plan summary for ${plan.length} files (names hidden, nothing was moved)\n`);
+  const verdicts = countVerdicts(plan);
+  console.log(`Verdicts:    allow ${verdicts.allow}, review ${verdicts.review}, block ${verdicts.block}`);
   console.log(`Actions:     move ${counts.move}, quarantine ${counts.quarantine}, skip ${counts.skip}`);
   console.log(`Categories:  ${countBy(plan.filter((i) => i.category), (i) => i.category!)}`);
   console.log(`Decided by:  ${countBy(plan, (i) => i.source)}`);
   console.log(`File types:  ${countBy(plan, (i) => contentKindOf(extname(i.name).toLowerCase()))}`);
   console.log(`Confidence:  ${countBy(plan.filter((i) => i.source !== "rule"), (i) => band(i.confidence))}`);
-  const skipped = plan.filter((i) => i.action === "skip");
-  console.log(`Skipped:     ${skipped.length ? countBy(skipped, (i) => i.reason.split(":")[0]!.replace(/\.$/, "")) : "none"}`);
+  const held = plan.filter((i) => i.verdict !== "allow").flatMap((i) => i.checks.map((check) => ({ check })));
+  // Strip numbers so "Low confidence (0.42)" and "(0.31)" count as one reason.
+  console.log(`Why held:    ${held.length ? countBy(held, (h) => h.check.replace(/\s*\(.*\)$/, "").replace(/\.$/, "")) : "nothing held"}`);
   console.log(`Review gate: ${gate.status}, ${gate.flagged} held; ${gate.note}`);
   console.log(`Time:        ${seconds.toFixed(1)} s${modelCalls ? ` (${(seconds / modelCalls).toFixed(1)} s per model call)` : ""}`);
 }
@@ -204,13 +233,17 @@ async function run(folder: string, yes: boolean, temporal: boolean): Promise<voi
   if (!plan || plan.inbox !== folder) {
     throw new Error(`No saved plan for ${folder}. Run \`dz preview\` first.`);
   }
-  const counts = summarize(plan.items);
-  const work = counts.move + counts.quarantine;
+  const runnable = movableItems(plan.items);
+  const waiting = plan.items.filter((item) => item.verdict === "review" && !isRunnable(item)).length;
+  const blocked = plan.items.filter((item) => item.verdict === "block").length;
+  const work = runnable.length;
   if (work === 0) {
-    console.log("The plan has nothing to move.");
+    console.log(`Nothing is allowed to run yet (${waiting} waiting for review, ${blocked} blocked).`);
     return;
   }
-  const question = `Move ${counts.move} and quarantine ${counts.quarantine} files, as planned at ${plan.createdAt}?`;
+  const moves = runnable.filter((item) => item.action === "move").length;
+  const bulk = batchNeedsApproval(plan.items) ? ` This is a bulk change (more than ${process.env.DZ_BULK_LIMIT ?? DEFAULT_BULK_LIMIT} files).` : "";
+  const question = `Move ${moves} and quarantine ${work - moves} files, as planned at ${plan.createdAt}? ${waiting} stay for review, ${blocked} are blocked.${bulk}`;
   if (!(await confirm(question, yes))) {
     console.log("Nothing was moved.");
     return;
@@ -237,6 +270,14 @@ async function run(folder: string, yes: boolean, temporal: boolean): Promise<voi
   console.log(`Run ${result.run}: moved ${result.moved} of ${work} files, every one verified by SHA-256.`);
   printFailures(result.failed);
   console.log("Changed your mind? `dz undo` puts everything back.");
+}
+
+async function approve(folder: string, files: string[], all: boolean): Promise<void> {
+  if (!all && files.length === 0) throw new Error("Name the files to approve with --file <name>, or pass --all.");
+  const { approved, unmatched } = await approveItems(folder, all ? "all" : files);
+  console.log(`Approved ${approved.length} ${approved.length === 1 ? "item" : "items"} for the next \`dz run\`.`);
+  for (const name of approved) console.log(`  approved  ${name}`);
+  for (const name of unmatched) console.log(`  not waiting for review: ${name}`);
 }
 
 async function undo(folder: string, yes: boolean, temporal: boolean, files: string[]): Promise<void> {
@@ -340,6 +381,7 @@ async function main(): Promise<void> {
       temporal: { type: "boolean" },
       out: { type: "string" },
       file: { type: "string", multiple: true },
+      all: { type: "boolean" },
     },
   });
   const [command, folderArg] = positionals;
@@ -356,6 +398,7 @@ async function main(): Promise<void> {
   if (command === "run") return run(folder, values.yes ?? false, values.temporal ?? false);
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
+  if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
   if (command === "receipts") return receipts(folder, values.out);
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");
 

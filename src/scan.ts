@@ -15,6 +15,8 @@ export interface ScannedFile {
   ageDays: number;
   sha256: string;
   partial: boolean;
+  /** Any execute bit set; such files are treated like programs. */
+  executable: boolean;
   duplicateOf?: string;
 }
 
@@ -43,6 +45,7 @@ export async function scanFolder(dir: string, now = new Date()): Promise<Scanned
       ageDays: Math.floor((now.getTime() - info.mtime.getTime()) / 86_400_000),
       sha256: await hashFile(path),
       partial: PARTIAL_EXTENSIONS.has(ext),
+      executable: (info.mode & 0o111) !== 0,
     });
   }
 

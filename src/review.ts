@@ -5,6 +5,7 @@ import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { contentKindOf } from "./extract.js";
 import type { SavedPlan } from "./execute.js";
+import { requireReview } from "./guard.js";
 import { readJournal } from "./journal.js";
 import { STATE_DIR, type PlanItem } from "./plan.js";
 
@@ -12,7 +13,7 @@ import { STATE_DIR, type PlanItem } from "./plan.js";
 // `dz undo --file` is a "reject" and every move left alone is a "keep". Once
 // there are enough of both, TabPFN (a tabular foundation model that learns from
 // a table in one forward pass, no training loop) scores each new move, and
-// likely rejects wait for review instead of moving. Only file metadata goes in,
+// likely rejects get a REVIEW verdict from the guard instead of moving. Only file metadata goes in,
 // never names or contents, and it all runs locally in ml/ through uv.
 
 export const MIN_DECISIONS = 20;
@@ -128,7 +129,7 @@ export interface GateResult {
 }
 
 /**
- * Scores planned moves and turns likely rejects into skips with a reason. Never
+ * Scores planned moves and sends likely rejects to review. Never
  * throws: if the gate cannot run, the plan is returned unchanged with a note.
  */
 export async function applyReviewGate(
@@ -147,7 +148,7 @@ export async function applyReviewGate(
       flagged: 0,
     };
   }
-  const moves = plan.filter((item) => item.action === "move");
+  const moves = plan.filter((item) => item.action === "move" && item.verdict !== "block");
   if (moves.length === 0) return { status: "on", note: "nothing to score", flagged: 0 };
 
   let scores: number[];
@@ -166,9 +167,7 @@ export async function applyReviewGate(
     const score = scores[i] ?? 0;
     if (score < REJECT_THRESHOLD) return;
     flagged++;
-    item.action = "skip";
-    item.reason = `Review: you moved back similar files before (${Math.round(score * 100)}% likely). Planned: ${item.target}`;
-    item.target = null;
+    requireReview(item, `You moved back similar files before (${Math.round(score * 100)}% likely)`);
   });
   return { status: "on", note: `learned from ${rows.length} decisions (${rejects} moved back)`, flagged };
 }

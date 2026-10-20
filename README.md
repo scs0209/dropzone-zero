@@ -40,36 +40,59 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz undo [folder]` | Reverses the most recent run: files go back to their old names and places, and folders the run created are removed if empty |
 | `dz undo [folder] --file <name>` | Moves single files from the last run back (by old name, new name, or new path) and teaches the review gate that this move was wrong |
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
+| `dz approve [folder] --file <name>` | Releases an item the guard holds for review, for exactly the move shown (`--all` releases every review item) |
 | `dz receipts [folder]` | Reads every receipt and invoice and writes date, vendor, total, currency, and document number to a CSV |
 
 `scan` and `preview` take `--json` for machine-readable output; `run` and `undo` take `--yes` to skip the confirmation, and `--temporal` to run as a durable workflow (below). `dz preview --summary` prints only counts and timings, with no file names, so you can share how it did on a real folder without sharing what is in it. The folder defaults to `DZ_INBOX`, then `~/Downloads`.
 
 Dropzone Zero keeps its state in a hidden `.dropzone` folder inside the folder it organizes: the saved plan, the journal (`journal.jsonl`), and `quarantine/`. Quarantine is never emptied for you.
 
+## Guardrails: the model proposes, the guard decides
+
+Three parts with separate jobs: the model reads files and proposes a plan; the guard decides what may run; the executor carries it out and verifies it. The model never decides whether something is allowed, and no file name or document text is ever treated as an instruction. The model can only answer with a category, a date, and a title, and code turns that into a move, so the worst a hostile document can do is get itself misfiled.
+
+Every planned item gets one verdict, shown in the first column of `dz preview`:
+
+| Verdict | When | What happens |
+|---|---|---|
+| `ALLOW` | A contained move or quarantine with a confident classification | Runs with `dz run` |
+| `REVIEW` | Programs and installers (by extension or execute bit), low confidence (under 0.5), failed classification, or the review gate expects you to undo it | Waits until `dz approve` releases that exact move |
+| `BLOCK` | Partial downloads, targets outside the folder, a change of file type, anything that is not a move or quarantine | Never runs, whatever is approved |
+
+The executor does not trust the plan file either. Right before each rename it judges the item again and checks the disk:
+
+- the source is a regular file, not a symbolic link;
+- the source and target really sit inside the folder after resolving symbolic links, and no folder on the way is a link (checked again after creating folders);
+- the target does not exist (no overwrites), and the file still has the hash it had at preview time;
+- an approval only counts for the exact content, action, and target that were approved: if the plan changes, it must be approved again;
+- the saved plan carries a SHA-256 digest, and a plan edited by anything but Dropzone Zero is refused.
+
+Runs of more than 20 allowed moves (`DZ_BULK_LIMIT`) are reported as bulk changes, which is where a second approval step plugs in.
+
 ## How a run stays safe
 
 - `dz run` executes exactly the plan you previewed. The model is not asked again, so what you saw is what happens.
-- A file is skipped, not moved, if it changed since the preview, if its target already exists, or if a target would leave the folder.
+- A file is skipped, not moved, if it changed since the preview, if its target already exists, or if the guard says no.
 - Every move is a rename inside the same folder tree: no copy, no delete, and the file is never in two places or none. The journal records each move as "started" before the rename and "done" after the new location is hashed, so even a run interrupted mid-move can be undone.
 - `dz undo` moves a file back only if it still has the hash it was moved with and its old place is free. If you edited a file after the run, undo leaves it where it is and tells you.
 
 ## A review gate that learns what you undo
 
-Everyone files differently. Some people keep installers in Downloads until setup is done; some never want screenshots sorted. Rather than adding settings for every habit, Dropzone Zero watches what you put back.
+Everyone files differently. Some people keep screenshots in Downloads to share them quickly; some never want exports sorted. Rather than adding settings for every habit, Dropzone Zero watches what you put back.
 
 - `dz undo --file <name>` moves one file back and records it as a rejected move. Moves you leave alone count as accepted. (Undoing a whole run teaches nothing; that usually means "not now", not "wrong place".)
 - Once a folder has at least 20 decisions with at least 3 of each kind, `dz preview` asks [TabPFN](https://priorlabs.ai), a tabular foundation model, how likely each planned move is to be put back. TabPFN learns from a small table in a single forward pass, with no training loop, which is what makes it practical for a few dozen personal decisions.
-- Moves that are more likely rejected than not are held: they show up as `skip` with the reason and the planned target, and nothing moves until you decide.
+- Moves that are more likely rejected than not get a `REVIEW` verdict with the reason, and nothing moves until you approve it.
 
 The gate only sees metadata: extension, file type, category, confidence, size, age, and the shape of the planned target. It never sees names or contents, and it runs locally through [uv](https://docs.astral.sh/uv/) with the TabPFN v2 weights, which need no account or API key. The first preview that uses it creates `ml/.venv` (about 1 GB, mostly PyTorch) and downloads the weights once. Set `DZ_REVIEW_GATE=off` to skip it.
 
-To see it on the demo, give the demo folder a synthetic past in which a fictional user kept moving installers back:
+To see it on the demo, give the demo folder a synthetic past in which a fictional user kept moving screenshots back:
 
 ```bash
 pnpm seed && pnpm seed:history
 pnpm dz preview demo/inbox
-# skip  installer  Notely-4.2.1.dmg   (Review: you moved back similar files before (81% likely). Planned: Installers/...)
-# Review gate: 2 held for review, learned from 90 decisions (10 moved back).
+# REVIEW  move  screenshot  Screenshot 2026-10-12 at 09.41.22.png  -> Screenshots/...  (You moved back similar files before (86% likely))
+# Review gate: 1 sent to review, learned from 90 decisions (11 moved back).
 ```
 
 Built with TabPFN. The v2 weights are under the [Prior Labs License](https://huggingface.co/Prior-Labs/TabPFN-v2-clf/blob/main/LICENSE.txt) (Apache 2.0 with an additional attribution requirement); newer TabPFN weights need a license acceptance and an API key, so Dropzone Zero does not use them.

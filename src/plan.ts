@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import type { Category, ClassifyResult } from "./classify.js";
+import { applyJudgement, isExecutable, type Verdict } from "./guard.js";
 import { applyRules, type Action } from "./rules.js";
 import type { ScannedFile } from "./scan.js";
 
@@ -9,8 +10,6 @@ export const STATE_DIR = ".dropzone";
 
 /** Inside the inbox and hidden, so scans skip it. The user empties it; Dropzone Zero never deletes. */
 export const QUARANTINE_DIR = `${STATE_DIR}/quarantine`;
-/** Below this, the file stays where it is and the plan says why. */
-export const MIN_CONFIDENCE = 0.5;
 
 export interface PlanItem {
   name: string;
@@ -26,6 +25,14 @@ export interface PlanItem {
   confidence: number;
   reason: string;
   source: "rule" | "model" | "fallback";
+  /** Programs and installers, by extension or execute bit. */
+  executable: boolean;
+  /** The guardrail engine's decision; see guard.ts. */
+  verdict: Verdict;
+  /** Why the item needs review or is blocked. */
+  checks: string[];
+  /** Set by `dz approve`; only valid while the fingerprint matches this exact move. */
+  approval?: { at: string; fingerprint: string };
 }
 
 export interface BuildPlanOptions {
@@ -46,7 +53,10 @@ function uniqueTarget(inbox: string, target: string, taken: Set<string>): string
   return candidate;
 }
 
-/** Turns scanned files into a read-only plan. Rules run first; the model only sees what is left. */
+/**
+ * Turns scanned files into a read-only plan. Rules run first; the model only sees
+ * what is left; the guardrail engine judges every item last.
+ */
 export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions): Promise<PlanItem[]> {
   const { inbox, classify, onProgress } = options;
   const taken = new Set<string>();
@@ -60,6 +70,9 @@ export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions)
         sha256: file.sha256,
         size: file.size,
         ageDays: file.ageDays,
+        executable: isExecutable(file.name, file.executable),
+        verdict: "allow",
+        checks: [],
         action: rule.action,
         category: null,
         target: rule.action === "quarantine" ? uniqueTarget(inbox, `${QUARANTINE_DIR}/${file.name}`, taken) : null,
@@ -69,11 +82,20 @@ export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions)
       });
     } else {
       const result = await classify(file);
-      const base = { name: file.name, sha256: file.sha256, size: file.size, ageDays: file.ageDays, category: result.category, confidence: result.confidence, source: result.source };
-      if (result.source === "fallback" || result.confidence < MIN_CONFIDENCE) {
-        const why = result.source === "fallback" ? result.reason : `Low confidence: ${result.reason}`;
-        plan.push({ ...base, action: "skip", target: null, reason: why });
-      } else if (result.category === "temp") {
+      const base = {
+        name: file.name,
+        sha256: file.sha256,
+        size: file.size,
+        ageDays: file.ageDays,
+        executable: isExecutable(file.name, file.executable),
+        verdict: "allow" as Verdict,
+        checks: [],
+        category: result.category,
+        confidence: result.confidence,
+        source: result.source,
+      };
+      // Unsure or failed classifications still get a proposed target; the guard holds them for review.
+      if (result.category === "temp") {
         const target = uniqueTarget(inbox, `${QUARANTINE_DIR}/${file.name}`, taken);
         plan.push({ ...base, action: "quarantine", target, reason: result.reason });
       } else {
@@ -81,6 +103,7 @@ export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions)
         plan.push({ ...base, action: "move", target, reason: result.reason });
       }
     }
+    applyJudgement(plan.at(-1)!);
     onProgress?.(index + 1, files.length);
   }
   return plan;

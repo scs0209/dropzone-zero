@@ -21,6 +21,9 @@ async function item(name: string, category: PlanItem["category"], target: string
     sha256: await hashFile(join(inbox, name)),
     size: 20,
     ageDays: 3,
+    executable: false,
+    verdict: "allow",
+    checks: [],
     action: "move",
     category,
     target,
@@ -39,15 +42,15 @@ async function run(items: PlanItem[]): Promise<string> {
 describe("feedbackRows", () => {
   it("labels kept moves and single-file undos", async () => {
     const runId = await run([
-      await item("setup.dmg", "installer", "Installers/setup.dmg"),
+      await item("shot.png", "screenshot", "Screenshots/shot.png"),
       await item("receipt.pdf", "receipt", "Finance/Receipts/2026-10/receipt.pdf"),
     ]);
-    await undoFiles(inbox, runId, ["setup.dmg"]);
+    await undoFiles(inbox, runId, ["shot.png"]);
     const rows = await feedbackRows(inbox);
     assert.deepEqual(
       rows.map((r) => [r.item.name, r.rejected]),
       [
-        ["setup.dmg", true],
+        ["shot.png", true],
         ["receipt.pdf", false],
       ],
     );
@@ -67,6 +70,9 @@ describe("features", () => {
       sha256: "",
       size: 999,
       ageDays: 4,
+      executable: false,
+      verdict: "allow",
+      checks: [],
       action: "move",
       category: "document",
       target: "Documents/2026-04-01-tax-return.pdf",
@@ -80,7 +86,7 @@ describe("features", () => {
   });
 
   it("encodes categories consistently across train and test", () => {
-    const base = { sha256: "", size: 1, ageDays: 0, action: "move" as const, target: "x/y", confidence: 1, reason: "", source: "model" as const };
+    const base = { sha256: "", size: 1, ageDays: 0, executable: false, verdict: "allow" as const, checks: [], action: "move" as const, target: "x/y", confidence: 1, reason: "", source: "model" as const };
     const { train, test, categorical } = encode(
       [{ ...base, name: "a.dmg", category: "installer" }],
       [{ ...base, name: "b.dmg", category: "installer" }],
@@ -92,7 +98,7 @@ describe("features", () => {
 describe("applyReviewGate", () => {
   async function history(rejects: number, keeps: number): Promise<void> {
     const items: PlanItem[] = [];
-    for (let i = 0; i < rejects; i++) items.push(await item(`app${i}.dmg`, "installer", `Installers/app${i}.dmg`));
+    for (let i = 0; i < rejects; i++) items.push(await item(`shot${i}.png`, "screenshot", `Screenshots/shot${i}.png`));
     for (let i = 0; i < keeps; i++) items.push(await item(`r${i}.pdf`, "receipt", `Finance/Receipts/r${i}.pdf`));
     const runId = await run(items);
     await undoFiles(inbox, runId, items.slice(0, rejects).map((i) => i.name));
@@ -100,17 +106,17 @@ describe("applyReviewGate", () => {
 
   it("stays off until there are enough decisions of both kinds", async () => {
     await history(2, 30);
-    const plan = [await item("new.dmg", "installer", "Installers/new.dmg")];
+    const plan = [await item("new.png", "screenshot", "Screenshots/new.png")];
     const gate = await applyReviewGate(inbox, plan, async () => assert.fail("should not predict"));
     assert.equal(gate.status, "off");
     assert.match(gate.note, /32 decisions, 2 moved back/);
-    assert.equal(plan[0]!.action, "move");
+    assert.equal(plan[0]!.verdict, "allow");
   });
 
   it("holds likely rejects for review and keeps the rest", async () => {
     await history(5, 20);
     const plan = [
-      await item("new.dmg", "installer", "Installers/new.dmg"),
+      await item("new.png", "screenshot", "Screenshots/new.png"),
       await item("new.pdf", "receipt", "Finance/Receipts/new.pdf"),
     ];
     const predictor: Predictor = async ({ train, labels, test }) => {
@@ -120,14 +126,15 @@ describe("applyReviewGate", () => {
     };
     const gate = await applyReviewGate(inbox, plan, predictor);
     assert.equal(gate.flagged, 1);
-    assert.equal(plan[0]!.action, "skip");
-    assert.match(plan[0]!.reason, /^Review: .*80% likely.*Installers\/new\.dmg/);
-    assert.equal(plan[1]!.action, "move");
+    assert.equal(plan[0]!.verdict, "review");
+    assert.deepEqual(plan[0]!.checks, ["You moved back similar files before (80% likely)"]);
+    assert.equal(plan[0]!.target, "Screenshots/new.png");
+    assert.equal(plan[1]!.verdict, "allow");
   });
 
   it("never breaks the preview when the model cannot run", async () => {
     await history(5, 20);
-    const plan = [await item("new.dmg", "installer", "Installers/new.dmg")];
+    const plan = [await item("new.png", "screenshot", "Screenshots/new.png")];
     const gate = await applyReviewGate(inbox, plan, async () => {
       throw new Error("uv not found");
     });

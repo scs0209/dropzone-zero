@@ -1,7 +1,8 @@
 // Gives the demo folder a synthetic past: decisions a fictional user made over
 // earlier runs, so the review gate has something to learn from on day one. This
-// user leaves installers in Downloads until setup is finished, so they keep
-// moving them back; anything else they move back only rarely.
+// user keeps screenshots in Downloads to share them quickly, so they keep
+// moving them back; anything else they move back only rarely. (Installers need
+// no history: the guard always holds programs for review.)
 // Everything here is generated. Usage: pnpm seed:history [folder]
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -35,11 +36,11 @@ const KINDS: Kind[] = [
   { category: "invoice", exts: [".pdf"], folder: "Finance/Invoices/2026-09", dated: true, size: [600, 900], rejectRate: () => 0.03 },
   { category: "booking", exts: [".pdf"], folder: "Travel/Bookings/2026-09", dated: true, size: [600, 900], rejectRate: () => 0.05 },
   { category: "photo", exts: [".jpg", ".png"], folder: "Photos/2026-09", dated: false, size: [100, 50_000], rejectRate: () => 0.05 },
-  { category: "screenshot", exts: [".png"], folder: "Screenshots/2026-09", dated: true, size: [150, 2_000], rejectRate: () => 0.05 },
+  { category: "screenshot", exts: [".png"], folder: "Screenshots/2026-09", dated: true, size: [150, 2_000], rejectRate: () => 0.9 },
   { category: "note", exts: [".txt", ".md"], folder: "Notes", dated: false, size: [50, 2_000], rejectRate: () => 0.05 },
   { category: "spreadsheet", exts: [".xlsx", ".csv"], folder: "Documents/Spreadsheets", dated: false, size: [80, 5_000], rejectRate: () => 0.05 },
   { category: "manual", exts: [".pdf"], folder: "Home/Manuals", dated: false, size: [600, 900], rejectRate: () => 0.03 },
-  { category: "installer", exts: [".dmg", ".pkg"], folder: "Installers", dated: false, size: [20_000, 60_000], rejectRate: () => 0.9 },
+  { category: "installer", exts: [".dmg", ".pkg"], folder: "Installers", dated: false, size: [20_000, 60_000], rejectRate: () => 0.05 },
 ];
 
 function syntheticRow(n: number, kind: Kind): FeedbackRow {
@@ -53,6 +54,9 @@ function syntheticRow(n: number, kind: Kind): FeedbackRow {
     sha256: "0".repeat(64),
     size,
     ageDays: Math.floor(random() * 60),
+    executable: kind.category === "installer",
+    verdict: "allow",
+    checks: [],
     action: "move",
     category: kind.category,
     target: `${kind.folder}/${stem}${ext}`,

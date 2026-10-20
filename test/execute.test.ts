@@ -27,6 +27,9 @@ async function file(name: string, content: string): Promise<PlanItem> {
     sha256: await hashFile(join(inbox, name)),
     size: content.length,
     ageDays: 0,
+    executable: false,
+    verdict: "allow",
+    checks: [],
     action: "move",
     category: "receipt",
     target: null,
@@ -97,8 +100,11 @@ describe("executePlan", () => {
 
   it("rejects targets outside the folder", async () => {
     const item = { ...(await file("a.pdf", "x")), target: "../escaped.pdf" };
-    const result = await executePlan(inbox, [item]);
-    assert.match(result.failed[0]?.error ?? "", /leaves the folder/);
+    // The batch never even picks it up...
+    assert.equal((await executePlan(inbox, [item])).moved, 0);
+    // ...and the executor refuses it if called directly.
+    const step = await moveOne(inbox, "r1", item);
+    assert.match(step.error ?? "", /leaves the folder/);
     assert.ok(existsSync(join(inbox, "a.pdf")));
   });
 

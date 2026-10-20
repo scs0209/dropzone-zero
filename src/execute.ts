@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { checkBeforeMove, checkBeforeRestore, fingerprint, isRunnable } from "./guard.js";
 import { Journal, newRunId, readJournal } from "./journal.js";
 import { STATE_DIR, type PlanItem } from "./plan.js";
 import { hashFile } from "./scan.js";
@@ -10,6 +12,16 @@ export interface SavedPlan {
   createdAt: string;
   model: string;
   items: PlanItem[];
+  /** SHA-256 of the items as Dropzone Zero wrote them; any other edit invalidates the plan. */
+  digest: string;
+}
+
+function planDigest(items: PlanItem[]): string {
+  return createHash("sha256").update(JSON.stringify(items)).digest("hex");
+}
+
+export class PlanTamperedError extends Error {
+  override name = "PlanTamperedError";
 }
 
 export function planPath(inbox: string): string {
@@ -17,18 +29,45 @@ export function planPath(inbox: string): string {
 }
 
 /** `dz preview` saves its plan so `dz run` executes exactly what the user saw, without asking the model again. */
-export async function savePlan(inbox: string, model: string, items: PlanItem[]): Promise<void> {
-  const plan: SavedPlan = { inbox, createdAt: new Date().toISOString(), model, items };
+export async function savePlan(inbox: string, model: string, items: PlanItem[], createdAt = new Date().toISOString()): Promise<void> {
+  const plan: SavedPlan = { inbox, createdAt, model, items, digest: planDigest(items) };
   await mkdir(join(inbox, STATE_DIR), { recursive: true });
   await writeFile(planPath(inbox), JSON.stringify(plan, null, 2) + "\n");
 }
 
+/**
+ * The saved plan, or null if there is none. Throws if the file was edited by
+ * anything but Dropzone Zero: what runs must be what the user previewed and approved.
+ */
 export async function loadPlan(inbox: string): Promise<SavedPlan | null> {
+  let text: string;
   try {
-    return JSON.parse(await readFile(planPath(inbox), "utf8")) as SavedPlan;
+    text = await readFile(planPath(inbox), "utf8");
   } catch {
     return null;
   }
+  const plan = JSON.parse(text) as SavedPlan;
+  if (plan.digest !== planDigest(plan.items)) {
+    throw new PlanTamperedError("The saved plan was changed outside Dropzone Zero. Run `dz preview` again.");
+  }
+  return plan;
+}
+
+/** Approves review items for this exact move (content, action, target). Returns the names approved. */
+export async function approveItems(inbox: string, names: string[] | "all"): Promise<{ approved: string[]; unmatched: string[] }> {
+  const plan = await loadPlan(inbox);
+  if (!plan) throw new Error("No saved plan. Run `dz preview` first.");
+  const approved: string[] = [];
+  const at = new Date().toISOString();
+  for (const item of plan.items) {
+    const wanted = names === "all" || names.includes(item.name) || (item.target !== null && names.includes(item.target));
+    if (!wanted || item.verdict !== "review") continue;
+    item.approval = { at, fingerprint: fingerprint(item) };
+    approved.push(item.name);
+  }
+  const unmatched = names === "all" ? [] : names.filter((n) => !approved.includes(n) && !plan.items.some((i) => i.target === n && approved.includes(i.name)));
+  await savePlan(inbox, plan.model, plan.items, plan.createdAt);
+  return { approved, unmatched };
 }
 
 /** Resolves a plan path and refuses anything that would escape the inbox (the plan file is editable). */
@@ -79,11 +118,13 @@ export async function moveOne(inbox: string, run: string, item: PlanItem): Promi
       await journal.write({ op: "move", from, to, sha256: item.sha256, state: "done" });
       return { name: from, ok: true };
     }
-    if (!existsSync(source)) throw new Error("File is gone");
+    // The guard decides again here, not just at preview: the plan file or the disk may have changed.
+    await checkBeforeMove(inbox, item);
     if ((await hashFile(source)) !== item.sha256) throw new Error("File changed since preview");
-    if (existsSync(destination)) throw new Error("Target already exists");
 
     await ensureDir(inbox, dirname(destination), journal);
+    // Once more after creating folders, to close the gap in which a folder could be swapped for a link.
+    await checkBeforeMove(inbox, item);
     await journal.write({ op: "move", from, to, sha256: item.sha256, state: "started" });
     await rename(source, destination);
     if ((await hashFile(destination)) !== item.sha256) {
@@ -110,8 +151,9 @@ export async function endRun(inbox: string, run: string, moved: number, failed: 
   if (existsSync(planPath(inbox))) await rename(planPath(inbox), join(inbox, STATE_DIR, `plan-${run}.json`));
 }
 
+/** Items the guard lets run now: allowed ones and approved reviews. */
 export function movableItems(items: PlanItem[]): PlanItem[] {
-  return items.filter((item) => item.action !== "skip" && item.target);
+  return items.filter(isRunnable);
 }
 
 export interface RunResult {
@@ -183,6 +225,7 @@ export async function restoreOne(inbox: string, run: string, move: MoveRecord): 
       if (existsSync(before) && (await hashFile(before)) === move.sha256) return { name: move.from, ok: true };
       throw new Error("File is no longer at its new place");
     }
+    await checkBeforeRestore(inbox, move.to, move.from);
     if ((await hashFile(now)) !== move.sha256) throw new Error("File changed since it was moved");
     if (existsSync(before)) throw new Error("Original place is taken");
     await rename(now, before);

@@ -16,6 +16,7 @@ function file(name: string, overrides: Partial<ScannedFile> = {}): ScannedFile {
     ageDays: 6,
     sha256: "0".repeat(64),
     partial: false,
+    executable: false,
     ...overrides,
   };
 }
@@ -86,14 +87,34 @@ describe("buildPlan", () => {
     );
   });
 
-  it("keeps low-confidence and fallback files in place", async () => {
+  it("holds low-confidence and fallback files for review", async () => {
     const plan = await buildPlan([file("a.pdf"), file("b.pdf")], {
       inbox,
       classify: async (f) =>
         f.name === "a.pdf" ? modelResult({ confidence: 0.3 }) : modelResult({ source: "fallback", confidence: 0.1 }),
     });
-    assert.deepEqual(summarize(plan), { move: 0, quarantine: 0, skip: 2 });
-    assert.match(plan[0]!.reason, /^Low confidence/);
+    assert.deepEqual(
+      plan.map((item) => [item.verdict, item.checks]),
+      [
+        ["review", ["Low confidence (0.30)"]],
+        ["review", ["The model could not classify this file"]],
+      ],
+    );
+  });
+
+  it("holds programs for review and blocks partial downloads", async () => {
+    const plan = await buildPlan([file("setup.dmg"), file("run.sh"), file("x.crdownload", { partial: true })], {
+      inbox,
+      classify: async (f) => modelResult({ category: "installer", folder: "Installers", newName: f.name }),
+    });
+    assert.deepEqual(
+      plan.map((item) => [item.verdict, item.checks[0]]),
+      [
+        ["review", "Program or installer"],
+        ["review", "Program or installer"],
+        ["block", "Download still in progress."],
+      ],
+    );
   });
 
   it("quarantines files the model calls temp", async () => {
