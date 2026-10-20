@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  The DEV cover image (1000x420): one scene, no text column. Zee naps in a
-  hammock strung across the frame, the title is woven into the hammock, and
-  below it the downloads file themselves. Rebuild with: pnpm media:cover
+  The DEV cover image (1000x420). A field of documents runs across the whole
+  frame: scattered and tilted on the left, settling into a grid sorted by kind
+  on the right. A scribble under the title straightens out the same way. One
+  tile in the sorted grid is Zee. Rebuild with: pnpm media:cover
 -->
 <html lang="en">
   <head>
@@ -10,93 +11,109 @@
     <title>Dropzone Zero cover</title>
     <style>
       * { margin: 0; }
-      html, body { width: 1000px; height: 420px; overflow: hidden; background: #f6e4cc; }
+      html, body { width: 1000px; height: 420px; overflow: hidden; background: #15191c; }
       svg { display: block; }
-      .type { font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; font-weight: 800; }
+      .title {
+        font-family: "SF Pro Display", -apple-system, "Helvetica Neue", Arial, sans-serif;
+        font-weight: 600; letter-spacing: -0.035em;
+      }
     </style>
   </head>
   <body>
-    <svg width="1000" height="420" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#f9eedf" />
-          <stop offset="1" stop-color="#f2d3ae" />
-        </linearGradient>
-        <!-- the middle of the hammock fabric, which the title follows -->
-        <path id="weave" d="M150 196 Q 500 392 850 196" />
-      </defs>
-
-      <rect width="1000" height="420" fill="url(#sky)" />
-      <circle cx="500" cy="96" r="128" fill="#f6d2a3" opacity="0.7" />
-      <circle cx="500" cy="96" r="78" fill="#f2bd82" opacity="0.45" />
-
-      <!-- ground -->
-      <path d="M0 372 C 200 352, 380 366, 520 362 S 840 350, 1000 360 L 1000 420 L 0 420 Z" fill="#e3c39c" />
-
-      <!-- two trees holding the hammock, cropped by the frame -->
-      <path d="M36 420 C 46 300, 52 180, 40 40 L 84 40 C 96 180, 92 300, 100 420 Z" fill="#7a5236" />
-      <path d="M900 420 C 908 300, 904 180, 916 40 L 960 40 C 948 180, 954 300, 964 420 Z" fill="#7a5236" />
-      <g fill="#7fa77f">
-        <circle cx="30" cy="20" r="70" />
-        <circle cx="110" cy="-6" r="62" />
-        <circle cx="960" cy="14" r="74" />
-        <circle cx="880" cy="-10" r="56" />
-      </g>
-      <g fill="#97bb90">
-        <circle cx="80" cy="44" r="34" />
-        <circle cx="924" cy="50" r="32" />
-      </g>
-
-      <!-- ropes -->
-      <path d="M80 140 L 150 186 M80 140 L 152 206" stroke="#a07c56" stroke-width="4" stroke-linecap="round" />
-      <path d="M920 140 L 850 186 M920 140 L 848 206" stroke="#a07c56" stroke-width="4" stroke-linecap="round" />
-
-      <!-- Zee lying in the hammock, only the head and one arm show over the edge -->
-      <g transform="rotate(-14 470 236)">
-        <line x1="438" y1="186" x2="424" y2="166" stroke="#6c7a82" stroke-width="5" stroke-linecap="round" />
-        <circle cx="421" cy="162" r="7" fill="#1d9e75" />
-        <rect x="408" y="184" width="104" height="86" rx="22" fill="#d7dee3" />
-        <rect x="421" y="196" width="78" height="58" rx="11" fill="#1f2a30" />
-        <path d="M434 224 q 8 -8 16 0" stroke="#5dcaa5" stroke-width="5" fill="none" stroke-linecap="round" />
-        <path d="M468 224 q 8 -8 16 0" stroke="#5dcaa5" stroke-width="5" fill="none" stroke-linecap="round" />
-        <path d="M451 238 q 8 6 16 0" stroke="#5dcaa5" stroke-width="4" fill="none" stroke-linecap="round" />
-      </g>
-      <!-- an arm dangling over the side -->
-      <path d="M560 262 C 574 290, 578 318, 572 342" stroke="#b8c2c8" stroke-width="13" fill="none" stroke-linecap="round" />
-      <circle cx="571" cy="346" r="10" fill="#a9b4ba" />
-
-      <!-- the hammock fabric, with the title woven in -->
-      <path d="M150 186 Q 500 366 850 186 L 852 206 Q 500 420 148 206 Z" fill="#c8623f" />
-      <path d="M150 186 Q 500 366 850 186" stroke="#e48a63" stroke-width="5" fill="none" />
-      <path d="M148 206 Q 500 420 852 206" stroke="#a84e30" stroke-width="5" fill="none" />
-      <text class="type" font-size="40" fill="#fbefe2" letter-spacing="3" dy="14">
-        <textPath href="#weave" startOffset="50%" text-anchor="middle">DROPZONE ZERO</textPath>
-      </text>
-
-      <!-- z z z drifting up from Zee -->
-      <g class="type" fill="#8b6f58">
-        <text x="364" y="170" font-size="20">z</text>
-        <text x="338" y="140" font-size="26">z</text>
-        <text x="306" y="104" font-size="32">z</text>
-      </g>
-
-      <!-- under the hammock: the messy pile sorts itself -->
-      <g>
-        <rect x="214" y="330" width="46" height="56" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(-16 237 358)" />
-        <rect x="244" y="334" width="46" height="56" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(12 267 362)" />
-        <rect x="228" y="342" width="46" height="56" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(-4 251 370)" />
-        <rect x="282" y="362" width="28" height="28" rx="5" fill="#e3b04b" transform="rotate(14 296 376)" />
-      </g>
-      <path d="M296 340 C 380 318, 470 380, 560 384 S 690 352, 744 356" stroke="#c9a77f" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round" fill="none" />
-      <g fill="#fffaf2" stroke="#d8c3a5" stroke-width="2">
-        <rect x="352" y="318" width="22" height="28" rx="3" transform="rotate(-12 363 332)" />
-        <rect x="470" y="360" width="22" height="28" rx="3" transform="rotate(10 481 374)" />
-        <rect x="640" y="352" width="22" height="28" rx="3" transform="rotate(-6 651 366)" />
-      </g>
-      <g>
-        <path d="M730 338 h 24 l 7 9 h 40 a 7 7 0 0 1 7 7 v 34 a 7 7 0 0 1 -7 7 h -64 a 7 7 0 0 1 -7 -7 v -43 a 7 7 0 0 1 7 -7 z" fill="#e3b04b" />
-        <path d="M780 346 h 22 l 7 9 h 36 a 7 7 0 0 1 7 7 v 30 a 7 7 0 0 1 -7 7 h -58 a 7 7 0 0 1 -7 -7 v -39 a 7 7 0 0 1 7 -7 z" fill="#7fa77f" />
-      </g>
+    <svg id="cover" width="1000" height="420" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
+      <rect width="1000" height="420" fill="#15191c" />
+      <g id="tiles"></g>
+      <path id="line" fill="none" stroke="#5dcaa5" stroke-width="2" stroke-linecap="round" />
+      <text class="title" x="500" y="226" text-anchor="middle" font-size="66" fill="#f1ebe2">Dropzone Zero</text>
     </svg>
+    <script>
+      // Seeded, so every render of the cover is the same picture.
+      let seed = 20261020;
+      const random = () => {
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const smooth = (a, b, x) => {
+        const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+        return t * t * (3 - 2 * t);
+      };
+
+      // Muted category colors; most documents stay neutral.
+      const kinds = ["#b8644a", "#c79a45", "#7d9c7f", "#6f8ea6"];
+      const svg = "http://www.w3.org/2000/svg";
+      const tiles = document.getElementById("tiles");
+      const W = 26, H = 34, dx = 40, dy = 48;
+      const rows = [14, 62, 110, 286, 334, 382]; // the band in the middle is left for the title
+      let zeeDone = false;
+
+      for (const [r, y0] of rows.entries()) {
+        for (let c = 0; c < 25; c++) {
+          const x0 = 14 + c * dx;
+          const order = smooth(260, 760, x0);
+          if (random() > 0.55 + order * 0.45) continue; // the mess has gaps
+          const chaos = 1 - order;
+          const x = x0 + (random() - 0.5) * 70 * chaos;
+          let y = y0 + (random() - 0.5) * 60 * chaos;
+          // Keep the band around the title clear.
+          if (y0 < 200) y = Math.min(y, 128);
+          else y = Math.max(y, 272);
+          const angle = (random() - 0.5) * 70 * chaos;
+          // Sorted side: each run of columns is one kind. Messy side: any kind.
+          const kind = order > 0.6 ? kinds[Math.floor(c / 2) % kinds.length] : kinds[Math.floor(random() * kinds.length)];
+          const colored = random() < 0.3 + order * 0.62;
+
+          const g = document.createElementNS(svg, "g");
+          g.setAttribute("transform", `translate(${x} ${y}) rotate(${angle} ${W / 2} ${H / 2})`);
+          const rect = document.createElementNS(svg, "rect");
+          rect.setAttribute("width", W);
+          rect.setAttribute("height", H);
+          rect.setAttribute("rx", 4);
+
+          const isZee = !zeeDone && r === 3 && c === 21;
+          if (isZee) {
+            zeeDone = true;
+            rect.setAttribute("fill", "#0c0f11");
+            rect.setAttribute("stroke", "#5dcaa5");
+            rect.setAttribute("stroke-width", 1.5);
+            g.appendChild(rect);
+            for (const ex of [9, 17]) {
+              const eye = document.createElementNS(svg, "circle");
+              eye.setAttribute("cx", ex);
+              eye.setAttribute("cy", 15);
+              eye.setAttribute("r", 2.6);
+              eye.setAttribute("fill", "#5dcaa5");
+              g.appendChild(eye);
+            }
+          } else {
+            rect.setAttribute("fill", colored ? kind : "#232a2f");
+            rect.setAttribute("opacity", colored ? 0.9 : 1);
+            g.appendChild(rect);
+            for (const [ly, lw] of [[10, 14], [16, 16], [22, 10]]) {
+              const line = document.createElementNS(svg, "rect");
+              line.setAttribute("x", 6);
+              line.setAttribute("y", ly);
+              line.setAttribute("width", lw);
+              line.setAttribute("height", 2);
+              line.setAttribute("rx", 1);
+              line.setAttribute("fill", colored ? "#15191c" : "#3a444b");
+              line.setAttribute("opacity", colored ? 0.35 : 1);
+              g.appendChild(line);
+            }
+          }
+          tiles.appendChild(g);
+        }
+      }
+
+      // The scribble under the title straightens out as it moves right.
+      const points = [];
+      for (let x = 300; x <= 700; x += 4) {
+        const chaos = 1 - smooth(330, 620, x);
+        const y = 254 + chaos * (Math.sin(x * 0.085) * 8 + Math.sin(x * 0.23) * 3);
+        points.push(`${x},${y.toFixed(1)}`);
+      }
+      document.getElementById("line").setAttribute("d", "M" + points.join(" L"));
+    </script>
   </body>
 </html>
