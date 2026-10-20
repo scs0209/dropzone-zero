@@ -26,3 +26,6 @@ __pycache__/
 app/src-tauri/target/
 app/src-tauri/gen/
 app/ui/vendor/
+
+# Local MCP servers (the Auth0 MCP is configured per machine)
+.mcp.json
