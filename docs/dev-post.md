@@ -91,6 +91,12 @@ Then I tried fine-tuning with [Tinker](https://thinkingmachines.ai/tinker/). Tin
 
 Fine-tuning fixed every date the base model missed (on bank statements it picked a transaction date instead of the statement date) and taught it to stop after the JSON: replies shrank from 282 to 150 characters on average. But the honest takeaway is about my test set, not the models. When three models land between 98% and 100%, the test is too easy to tell them apart. Harder cases, such as scans with no text layer, come before fine-tuning Gemma itself.
 
+### Approving from my phone, without opening a door to my Mac
+
+The guard's questions used to wait for me at my desk. Now they also come to my phone. With [Auth0](https://auth0.com)'s Client-Initiated Backchannel Authentication (CIBA), the daemon asks Auth0 to send a Guardian push to me, then polls until I answer. I tap **Allow** on the bus, and the installer is filed before I get home; I tap **Deny**, and it stays in Downloads. Whichever answer comes first, Zee's bubble or the phone, decides, and the other question closes.
+
+Two things made this fit the rest of the project. The push carries only the kind of move, "Dropzone Zero: move 1 installer", never a file name, because the file name is exactly the private part. And nothing has to reach my Mac: the daemon only makes outgoing requests, its API still listens on 127.0.0.1 alone, and an approval releases the same single, fingerprint-bound move that **Move it** does in Zee, through the same guard. If I ignore the push, nothing happens; Zee simply keeps asking.
+
 ### Seeing what the agent does
 
 With a Sentry DSN set, every Gemma call becomes a `gen_ai.chat` span with the model, input and output tokens, whether an image went in, and how long it took. The cost is recorded as $0, because it is. Prompts, replies, file names, and paths are never sent; error messages and stack frames are scrubbed of paths before they leave.
@@ -125,6 +131,7 @@ The best part of a sloth agent is that being lazy is safe. If Gemma gets one wro
 - **Best Use of Gemma**: Gemma 4 e4b runs locally through Ollama for every classification, including vision for photographed receipts.
 - **Best Use of Tinker**: a LoRA control on the synthetic set, scored by the same pipeline: date accuracy from 92.1% to 100% over the untrained baseline, with replies half as long.
 - **Best Use of TabPFN**: a local review gate that learns from single-file undos.
+- **Best Use of Auth0 for AI Agents**: the agent asks a person before a risky move, on their phone, through CIBA and Guardian push; only the kind of move leaves the machine.
 - **Best Use of Temporal**: durable `dz run` and `dz undo` that resume after a crash.
 - **Best Use of Mastra**: `dz tidy` as a workflow with a suspend/resume approval step.
 - **Best Use of Sentry Agent Tracing**: a `gen_ai.chat` span per model call with tokens and latency, and nothing private in it.

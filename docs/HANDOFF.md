@@ -25,7 +25,10 @@ pnpm test                      # daemon tests bind a local port
 Everything in the README, plus: Sentry `gen_ai.chat` spans (checked with a real DSN),
 the Tinker control experiment (`ml/finetune.py`, `dz eval --provider replay`),
 the post draft `docs/dev-post.md`, cover and both GIFs in `docs/media/`, and Zee no
-longer shakes while its bubble is resized (checked in the app).
+longer shakes while its bubble is resized (checked in the app). Auth0 remote approval
+(CIBA + Guardian push) works end to end: a real push approved on the phone moved a held
+installer in 13 s. The Auth0 app is "Dropzone Zero approvals" (CIBA grant only); the
+`AUTH0_*` keys live in `.env` on the first Mac only.
 Backboard and Render were dropped.
 
 ## Open
@@ -35,10 +38,6 @@ Backboard and Render were dropped.
 - **Numbers to reconcile:** the README says 75% of a real folder went to "other"
   before the new categories; the work notes say 39 of 55 files (about 71%).
   The post uses 39/55 -> 8/55.
-- **Auth0 remote approval (CIBA):** code, tests, and the Auth0 app ("Dropzone Zero approvals",
-  CIBA grant only, Guardian push channel) are done; the `AUTH0_*` keys are in `.env` on the
-  first Mac. Still open: turn on Guardian push MFA for the tenant, enroll the approver, then
-  test a real push end to end and add an Auth0 section to the post.
 - Not done: ElevenLabs, .ics follow-up, .tech domain.
 
 ## Conventions
