@@ -167,6 +167,8 @@ export function movableItems(items: PlanItem[]): PlanItem[] {
 export interface RunResult {
   run: string;
   moved: number;
+  /** What went where, paths relative to the folder, so people can see it. */
+  moves: { from: string; to: string }[];
   failed: { name: string; error: string }[];
 }
 
@@ -179,10 +181,13 @@ export async function executePlan(
 ): Promise<RunResult> {
   const work = movableItems(items);
   await beginRun(inbox, run, work.length);
-  const result: RunResult = { run, moved: 0, failed: [] };
+  const result: RunResult = { run, moved: 0, moves: [], failed: [] };
   for (const [index, item] of work.entries()) {
     const step = await moveOne(inbox, run, item);
-    if (step.ok) result.moved++;
+    if (step.ok) {
+      result.moved++;
+      result.moves.push({ from: item.name, to: item.target! });
+    }
     else result.failed.push({ name: step.name, error: step.error! });
     onProgress?.(index + 1, work.length);
   }

@@ -34,6 +34,7 @@ const ScannedFileSchema = z.object({
 const RunResultSchema = z.object({
   run: z.string(),
   moved: z.number(),
+  moves: z.array(z.object({ from: z.string(), to: z.string() })),
   failed: z.array(z.object({ name: z.string(), error: z.string() })),
 });
 

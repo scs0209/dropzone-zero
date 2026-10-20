@@ -26,10 +26,13 @@ export async function runPlanWorkflow(inbox: string, run: string, items: PlanIte
   setHandler(progressQuery, () => progress);
 
   await steps.beginRun(inbox, run, items.length);
-  const result: RunResult = { run, moved: 0, failed: [] };
+  const result: RunResult = { run, moved: 0, moves: [], failed: [] };
   for (const item of items) {
     const step = await steps.moveOne(inbox, run, item);
-    if (step.ok) result.moved++;
+    if (step.ok) {
+      result.moved++;
+      result.moves.push({ from: item.name, to: item.target! });
+    }
     else result.failed.push({ name: step.name, error: step.error ?? "Unknown error" });
     progress.done++;
   }

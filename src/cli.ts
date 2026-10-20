@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, extname, join, relative, resolve } from "node:path";
+import { execFile } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
@@ -21,6 +22,7 @@ import {
 import { contentKindOf, extractContent } from "./extract.js";
 import { batchNeedsApproval, DEFAULT_BULK_LIMIT, fingerprint, isRunnable } from "./guard.js";
 import { notify } from "./notify.js";
+import { describeMoves, recentMoves } from "./recent.js";
 import { newRunId } from "./journal.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
@@ -49,6 +51,8 @@ Usage:
   dz watch [folder] [--auto] [--include-existing]
                                  Keep planning as files arrive; --auto moves new files the guard
                                  allows and asks you, right there, about the rest
+  dz recent [folder] [--reveal] [--file <name>] [--limit N]
+                                 Show what moved where; --reveal opens it in Finder
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
   dz autostart enable [folder] | disable | status
                                  Start dz watch --auto at login (macOS LaunchAgent)
@@ -376,6 +380,7 @@ function printCycle(result: CycleResult): void {
   if (result.run) {
     const files = result.run.moved === 1 ? "file" : "files";
     console.log(`${time}  moved ${result.run.moved} ${files} (run ${result.run.run}); \`dz undo\` reverses it`);
+    for (const move of result.run.moves) console.log(`          ${move.from}  ->  ${move.to}`);
     printFailures(result.run.failed);
   } else if (result.held) {
     console.log(`${time}  not running: ${result.held}`);
@@ -442,8 +447,9 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
     onCycle: (result) => {
       recordCounts("dz.watch", { planned: result.planned, moved: result.run?.moved ?? 0 });
       printCycle(result);
-      if (result.run?.moved) {
-        notify("Dropzone Zero", `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}. \`dz undo\` puts ${result.run.moved === 1 ? "it" : "them"} back.`);
+      if (result.run?.moves.length) {
+        // Where it went, so nobody has to go looking; `dz recent --reveal` opens it in Finder.
+        notify("Dropzone Zero: filed", describeMoves(result.run.moves));
       }
       if (result.needsDecision) onDecision(result.needsDecision);
     },
@@ -490,6 +496,33 @@ async function autostart(action: string | undefined, folderArg: string | undefin
     return;
   }
   throw new Error("Usage: dz autostart enable [folder] | disable | status");
+}
+
+async function recent(folder: string, json: boolean, reveal: boolean, file: string | undefined, limit: number): Promise<void> {
+  const moves = await recentMoves(folder, limit);
+  if (json) {
+    process.stdout.write(JSON.stringify(moves, null, 2) + "\n");
+    return;
+  }
+  if (moves.length === 0) {
+    console.log("Nothing has been moved in this folder yet.");
+    return;
+  }
+  for (const move of moves) {
+    const when = new Date(move.at).toLocaleString();
+    const note = !move.current ? "  (moved back by dz undo)" : !move.present ? "  (no longer there)" : "";
+    console.log(`${when}  ${move.from}  ->  ${move.to}${note}`);
+  }
+  if (!reveal) {
+    console.log("\n`dz recent --reveal` shows the latest one in Finder; add --file <name> for another.");
+    return;
+  }
+  const target = moves.find((m) => m.current && m.present && (!file || m.from === file || m.to.endsWith(`/${file}`)));
+  if (!target) throw new Error(file ? `No current move found for ${file}.` : "The recent files are no longer where they were moved.");
+  // Opens a Finder window with the file selected. Local only.
+  await new Promise<void>((resolveOpen, rejectOpen) =>
+    execFile("open", ["-R", join(folder, target.to)], (error) => (error ? rejectOpen(error) : resolveOpen())),
+  );
 }
 
 async function approve(folder: string, files: string[], all: boolean): Promise<void> {
@@ -603,6 +636,8 @@ async function main(): Promise<void> {
       file: { type: "string", multiple: true },
       all: { type: "boolean" },
       auto: { type: "boolean" },
+      reveal: { type: "boolean" },
+      limit: { type: "string" },
       "include-existing": { type: "boolean" },
     },
   });
@@ -622,6 +657,9 @@ async function main(): Promise<void> {
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
   if (command === "status") return status(folder, json);
+  if (command === "recent") {
+    return recent(folder, json, values.reveal ?? false, values.file?.[0], Number(values.limit ?? 20));
+  }
   if (command === "tidy") return tidy(folder, values.yes ?? false);
   if (command === "watch") return watchFolder(folder, values.auto ?? false, values["include-existing"] ?? false);
   if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
