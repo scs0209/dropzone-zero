@@ -140,8 +140,9 @@ export class Daemon {
       this.eatingUntil = Date.now() + 4_000;
       this.lastRun = { run: result.run.run, moved: result.run.moved };
       this.lastMessage = `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}.`;
-      this.recent = await recentMoves(this.options.folder, 8);
     }
+    // Every pass, not only after its own moves: the journal is the record, whoever wrote it.
+    this.recent = await recentMoves(this.options.folder, 8);
     for (const item of result.needsDecision?.reviews ?? []) {
       this.pending.push({ kind: "review", id: fingerprint(item), title: `${item.name} → ${item.target}`, detail: item.checks.join("; ") });
     }

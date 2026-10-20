@@ -21,6 +21,7 @@ import {
 } from "./execute.js";
 import { contentKindOf, extractContent } from "./extract.js";
 import { batchNeedsApproval, DEFAULT_BULK_LIMIT, fingerprint, isRunnable } from "./guard.js";
+import { acquireWatchLock, WatcherRunningError } from "./lock.js";
 import { notify } from "./notify.js";
 import { describeMoves, recentMoves } from "./recent.js";
 import { newRunId } from "./journal.js";
@@ -405,6 +406,7 @@ async function waitForOllama(client: OllamaClient): Promise<void> {
 }
 
 async function watchFolder(folder: string, auto: boolean, includeExisting: boolean): Promise<void> {
+  const release = await acquireWatchLock(folder, auto ? "watch --auto" : "watch");
   const client = new OllamaClient();
   await waitForOllama(client);
   console.log(
@@ -463,6 +465,7 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
     process.once("SIGINT", () => {
       control.stop();
       rl?.close();
+      release();
       console.log("\nStopped watching.");
       resolveStop();
     });
@@ -532,6 +535,7 @@ async function recent(folder: string, json: boolean, reveal: boolean, file: stri
 
 /** The watcher plus the local API the Zee desktop app talks to. */
 async function daemon(folder: string): Promise<void> {
+  const release = await acquireWatchLock(folder, "daemon");
   const client = new OllamaClient();
   const { Daemon } = await import("./daemon.js");
   const instance = new Daemon({
@@ -548,7 +552,11 @@ async function daemon(folder: string): Promise<void> {
   await instance.start();
   console.log(`Daemon watching ${folder}; the Zee app connects on 127.0.0.1. Press Ctrl+C to stop.`);
   await new Promise<void>((resolveStop) => {
-    const stop = () => void instance.stop().then(resolveStop);
+    const stop = () =>
+      void instance.stop().then(() => {
+        release();
+        resolveStop();
+      });
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
   });
@@ -711,7 +719,10 @@ try {
   await main();
 } catch (error: unknown) {
   // Setup problems (a server not running) are the user's to fix, not bugs to report.
-  const setupProblem = error instanceof OllamaUnavailableError || (error as Error)?.name === "TemporalUnavailableError";
+  const setupProblem =
+    error instanceof OllamaUnavailableError ||
+    error instanceof WatcherRunningError ||
+    (error as Error)?.name === "TemporalUnavailableError";
   if (!setupProblem) captureError(error);
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;

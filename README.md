@@ -135,7 +135,7 @@ pnpm dz autostart disable              # stops it and removes it from login
 
 This writes a standard per-user LaunchAgent (`~/Library/LaunchAgents/dev.dropzone-zero.watch.plist`), loads it with `launchctl`, and logs to `~/Library/Logs/dropzone-zero/watch.log`. If Ollama is not up yet at login, the watcher waits for it. In the background there is no terminal to ask in, so decisions arrive as notifications and are answered with `dz status`, `dz approve`, or `dz run`. macOS may ask whether node may access your Downloads folder; the watcher needs that permission to read it.
 
-While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
+Only one watcher runs per folder: `dz watch` and `dz daemon` take a lock in `.dropzone/watch.lock`, and a second one refuses to start and names the one already running (two watchers would race for the same download). While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
 
 ## Zee, the desktop companion
 
