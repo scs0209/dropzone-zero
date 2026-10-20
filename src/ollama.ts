@@ -1,4 +1,5 @@
 import type { ModelClient } from "./classify.js";
+import { withModelSpan, type ModelCall } from "./telemetry.js";
 
 export const DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434";
 // Gemma 4 E4B: Apache 2.0, multimodal, and small enough for a laptop. Tagged explicitly
@@ -43,6 +44,10 @@ export class OllamaClient implements ModelClient {
   }
 
   async generate(prompt: string, images?: string[], schema?: object): Promise<string> {
+    return withModelSpan(this.model, Boolean(images?.length), () => this.call(prompt, images, schema));
+  }
+
+  private async call(prompt: string, images?: string[], schema?: object): Promise<ModelCall> {
     const response = await fetch(`${this.host}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -62,7 +67,7 @@ export class OllamaClient implements ModelClient {
     if (!response.ok) {
       throw new Error(`Ollama returned HTTP ${response.status}: ${await response.text()}`);
     }
-    const { response: text } = (await response.json()) as { response?: string };
-    return text ?? "";
+    const body = (await response.json()) as { response?: string; prompt_eval_count?: number; eval_count?: number };
+    return { text: body.response ?? "", inputTokens: body.prompt_eval_count, outputTokens: body.eval_count };
   }
 }

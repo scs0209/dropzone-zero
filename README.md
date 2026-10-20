@@ -254,7 +254,7 @@ What this says: fine-tuning fixed the base model's date misses (it picked a tran
 
 ## Telemetry
 
-Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves, quarantines, skips, fallbacks), timings, and errors to [Sentry](https://sentry.io). File names, paths, and contents are never sent: console and HTTP breadcrumbs are disabled, and every error message and stack frame is scrubbed of paths before it leaves the machine.
+Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves, quarantines, skips, fallbacks), timings, and errors to [Sentry](https://sentry.io). Every Gemma call is traced as a `gen_ai.chat` span with the model name, input and output tokens, whether an image went in, and its duration (cost is recorded as $0, since the model runs locally), so a slow or failing model shows up in Sentry's AI monitoring. `DZ_SENTRY_DEBUG=1` prints what the SDK sends. File names, paths, prompts, replies, and contents are never sent: console and HTTP breadcrumbs are disabled, and every error message and stack frame is scrubbed of paths before it leaves the machine.
 
 ## Roadmap
 

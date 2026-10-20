@@ -48,6 +48,8 @@ export async function initTelemetry(): Promise<void> {
     // Default integrations add console and HTTP breadcrumbs, which would carry file names.
     defaultIntegrations: false,
     tracesSampleRate: 1,
+    // DZ_SENTRY_DEBUG=1 prints what the SDK sends, to check the setup.
+    debug: process.env.DZ_SENTRY_DEBUG === "1",
     beforeBreadcrumb: () => null,
     beforeSend: scrubEvent,
   });
@@ -56,6 +58,47 @@ export async function initTelemetry(): Promise<void> {
 /** Times a block as a Sentry span. Callers pass only aggregate, name-free attributes. */
 export async function withSpan<T>(name: string, fn: () => Promise<T>): Promise<T> {
   return sentry ? sentry.startSpan({ name, op: "dz" }, fn) : fn();
+}
+
+export interface ModelCall {
+  text: string;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+/**
+ * Traces one model call as a Sentry AI span: model, token counts, whether an image
+ * went in, and how long it took. Never the prompt or the reply, which hold file
+ * contents. Cost is recorded as 0 because the model runs on this machine.
+ */
+export async function withModelSpan(
+  model: string,
+  hasImage: boolean,
+  fn: () => Promise<ModelCall>,
+): Promise<string> {
+  if (!sentry) return (await fn()).text;
+  return sentry.startSpan(
+    {
+      name: `chat ${model}`,
+      op: "gen_ai.chat",
+      attributes: {
+        "gen_ai.operation.name": "chat",
+        "gen_ai.system": "ollama",
+        "gen_ai.request.model": model,
+        "dz.image_input": hasImage,
+      },
+    },
+    async (span) => {
+      const call = await fn();
+      span.setAttributes({
+        "gen_ai.usage.input_tokens": call.inputTokens ?? 0,
+        "gen_ai.usage.output_tokens": call.outputTokens ?? 0,
+        "gen_ai.usage.total_tokens": (call.inputTokens ?? 0) + (call.outputTokens ?? 0),
+        "gen_ai.usage.cost_usd": 0,
+      });
+      return call.text;
+    },
+  );
 }
 
 export function recordCounts(prefix: string, counts: Record<string, number>): void {
