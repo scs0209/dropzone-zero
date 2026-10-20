@@ -15,3 +15,9 @@ tauri-build = { version = "=2.7.1", features = [] }
 tauri = { version = "=2.12.1", features = ["macos-private-api", "tray-icon", "image-png"] }
 # Reading the daemon's info file (already in the tree through tauri).
 serde_json = "1"
+
+# Resizing Zee's window in one step on macOS (fit_window in main.rs). Same
+# versions Tauri already builds, so nothing new is downloaded.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = "=0.3.2"
+objc2-foundation = "=0.3.2"

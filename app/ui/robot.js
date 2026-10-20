@@ -81,9 +81,15 @@ scene.add(shadow);
 // Moods, as set by zee.js: sleeping, thinking, eating, asking, dizzy, paused.
 let mood = document.body.className || "sleeping";
 const pointer = { x: 0, y: 0 };
+// Where the pointer is relative to Zee itself, not to the window: the window changes
+// size while the bubble is resized, and measured against it the pointer seemed to
+// jump, so Zee's head swung back and forth.
+const REACH = 160; // pixels from Zee's centre at which Zee looks fully to one side
 window.addEventListener("mousemove", (event) => {
-  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -((event.clientY / window.innerHeight) * 2 - 1);
+  const box = canvas.getBoundingClientRect();
+  const clamp = (v) => Math.max(-1, Math.min(1, v));
+  pointer.x = clamp((event.clientX - (box.left + box.width / 2)) / REACH);
+  pointer.y = clamp(-(event.clientY - (box.top + box.height / 2)) / REACH);
 });
 
 window.zeeRobot = {

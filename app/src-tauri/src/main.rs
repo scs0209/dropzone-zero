@@ -41,6 +41,44 @@ fn start_services(services: State<Services>) -> Result<(), String> {
     services.ensure()
 }
 
+/// Resizes Zee's window to `width` x `height` (logical points) while its bottom-right
+/// corner, where Zee sits, stays exactly where it is. Size and position change in
+/// one step: done as two calls from the page, the window first grew from its
+/// top-left corner and then moved back, so Zee shook on every pointer move while
+/// the bubble was being resized.
+#[tauri::command]
+fn fit_window(window: tauri::WebviewWindow, width: f64, height: f64) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let ns_window = window.ns_window().map_err(|e| e.to_string())? as usize;
+        window
+            .run_on_main_thread(move || {
+                use objc2_app_kit::NSWindow;
+                use objc2_foundation::NSSize;
+                // SAFETY: Tauri hands out the window's live NSWindow, and this runs on the main thread.
+                let ns_window = unsafe { &*(ns_window as *const NSWindow) };
+                let mut frame = ns_window.frame();
+                // Cocoa's origin is the bottom-left corner, so keeping origin.y keeps the
+                // bottom edge; the right edge is kept by moving origin.x.
+                frame.origin.x += frame.size.width - width;
+                frame.size = NSSize::new(width, height);
+                ns_window.setFrame_display(frame, true);
+            })
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let scale = window.scale_factor().map_err(|e| e.to_string())?;
+        let position = window.outer_position().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
+        let size = window.outer_size().map_err(|e| e.to_string())?.to_logical::<f64>(scale);
+        let (right, bottom) = (position.x + size.width, position.y + size.height);
+        window.set_size(tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
+        window
+            .set_position(tauri::LogicalPosition::new(right - width, bottom - height))
+            .map_err(|e| e.to_string())
+    }
+}
+
 /// Shows or hides Zee and keeps the menu bar item's label in step.
 #[tauri::command]
 fn set_zee_visible(app: AppHandle, visible: bool) {
@@ -73,7 +111,7 @@ fn toggle(app: &AppHandle) {
 fn main() {
     let app = tauri::Builder::default()
         .manage(Services::default())
-        .invoke_handler(tauri::generate_handler![daemon_info, start_services, set_zee_visible, set_attention])
+        .invoke_handler(tauri::generate_handler![daemon_info, start_services, fit_window, set_zee_visible, set_attention])
         .setup(|app| {
             // Bring up what Zee needs without holding up the window.
             let handle = app.handle().clone();

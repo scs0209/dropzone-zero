@@ -239,7 +239,9 @@ async function fitWindow() {
   try {
     do {
       fitAgain = false;
-      await placeWindow(await anchor());
+      // One native step that keeps Zee's corner fixed (see fit_window in main.rs).
+      const { w, h } = windowSize();
+      await window.__TAURI__.core.invoke("fit_window", { width: w, height: h });
     } while (fitAgain);
   } catch {
     // Window APIs unavailable; the layout still works inside the current window.
