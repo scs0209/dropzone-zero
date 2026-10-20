@@ -62,7 +62,7 @@ function render(state) {
   const question = state.pending.map((p) => p.id).join(",");
   if (state.mood === "asking" && question !== autoOpenedFor) {
     autoOpenedFor = question;
-    bubble.hidden = false;
+    setBubbleOpen(true);
   }
   lastMood = state.mood;
 }
@@ -106,7 +106,7 @@ function drawRecent(recent) {
 function showError(error) {
   setMood("dizzy");
   $("message").textContent = error instanceof Error ? error.message : String(error);
-  bubble.hidden = false;
+  setBubbleOpen(true);
 }
 
 async function decide(id, approve, buttons) {
@@ -148,71 +148,153 @@ window.addEventListener("mousemove", (event) => {
 zee.addEventListener("click", () => {
   const dragged = press?.dragged;
   press = null;
-  if (!dragged) bubble.hidden = !bubble.hidden;
+  if (!dragged) setBubbleOpen(bubble.hidden);
 });
 
-// Remember where Zee was put, and come back there next time (if that spot is still on a screen).
-const POSITION_KEY = "zee-position";
+// The window is sized to what it shows: just Zee when the bubble is closed (so it
+// does not cover other windows), Zee plus the bubble when it is open. Zee's
+// bottom-right corner is the anchor, so Zee never jumps when the bubble opens,
+// closes, or is resized.
+const ZEE_BOX = 152; // 128 px Zee plus margins
+const BUBBLE_ABOVE_ZEE = 146; // matches the bubble's bottom offset in style.css
+const BUBBLE_MIN = { w: 220, h: 120 };
+const BUBBLE_MAX = { w: 640, h: 720 };
+const BUBBLE_KEY = "zee-bubble-size";
+const ANCHOR_KEY = "zee-anchor";
 
-async function restorePosition() {
-  if (!tauriWindow) return;
+function load(key) {
   try {
-    const saved = JSON.parse(localStorage.getItem(POSITION_KEY) ?? "null");
-    const monitor = await tauriWindow.currentMonitor();
-    if (!saved || !monitor) return;
-    const { position, size } = monitor;
-    const onScreen =
-      saved.x >= position.x && saved.y >= position.y && saved.x < position.x + size.width - 50 && saved.y < position.y + size.height - 50;
-    if (onScreen) await tauriWindow.setPosition(new window.__TAURI__.dpi.PhysicalPosition(saved.x, saved.y));
+    return JSON.parse(localStorage.getItem(key) ?? "null");
   } catch {
-    // Storage or window APIs unavailable: stay where the app placed Zee.
+    return null;
+  }
+}
+function save(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Not remembered; defaults next time.
   }
 }
 
-let saveTimer;
-tauriWindow?.onMoved(({ payload }) => {
+let bubbleSize = load(BUBBLE_KEY) ?? { w: 276, h: 222 };
+function applyBubbleSize() {
+  document.documentElement.style.setProperty("--bubble-w", `${bubbleSize.w}px`);
+  document.documentElement.style.setProperty("--bubble-h", `${bubbleSize.h}px`);
+}
+applyBubbleSize();
+
+function windowSize() {
+  return bubble.hidden ? { w: ZEE_BOX, h: ZEE_BOX } : { w: Math.max(bubbleSize.w + 24, ZEE_BOX), h: bubbleSize.h + BUBBLE_ABOVE_ZEE + 12 };
+}
+
+/** Where Zee's bottom-right corner is, in logical screen pixels. */
+async function anchor() {
+  const scale = await tauriWindow.scaleFactor();
+  const position = (await tauriWindow.outerPosition()).toLogical(scale);
+  const size = (await tauriWindow.outerSize()).toLogical(scale);
+  return { right: position.x + size.width, bottom: position.y + size.height };
+}
+
+async function placeWindow(corner) {
+  const { LogicalPosition, LogicalSize } = window.__TAURI__.dpi;
+  const { w, h } = windowSize();
+  await tauriWindow.setSize(new LogicalSize(w, h));
+  await tauriWindow.setPosition(new LogicalPosition(corner.right - w, corner.bottom - h));
+}
+
+// One fit at a time; a request that arrives meanwhile is folded into one more pass.
+let fitting = false;
+let fitAgain = false;
+async function fitWindow() {
+  if (!tauriWindow) return;
+  if (fitting) {
+    fitAgain = true;
+    return;
+  }
+  fitting = true;
+  try {
+    do {
+      fitAgain = false;
+      await placeWindow(await anchor());
+    } while (fitAgain);
+  } catch {
+    // Window APIs unavailable; the layout still works inside the current window.
+  } finally {
+    fitting = false;
+  }
+}
+
+function setBubbleOpen(open) {
+  if (bubble.hidden === !open) return;
+  bubble.hidden = !open;
+  fitWindow();
+}
+
+// Resize the bubble from its top-left corner. Pointer capture keeps the drag going
+// even when the pointer runs ahead of the window edge.
+const handle = $("bubble-resize");
+let resizing = null;
+handle.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  handle.setPointerCapture(event.pointerId);
+  resizing = { x: event.screenX, y: event.screenY, w: bubbleSize.w, h: bubbleSize.h };
+});
+handle.addEventListener("pointermove", (event) => {
+  if (!resizing) return;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(v)));
+  bubbleSize = {
+    w: clamp(resizing.w + resizing.x - event.screenX, BUBBLE_MIN.w, BUBBLE_MAX.w),
+    h: clamp(resizing.h + resizing.y - event.screenY, BUBBLE_MIN.h, BUBBLE_MAX.h),
+  };
+  applyBubbleSize();
+  fitWindow();
+});
+const endResize = () => {
+  if (!resizing) return;
+  resizing = null;
+  save(BUBBLE_KEY, bubbleSize);
+};
+handle.addEventListener("pointerup", endResize);
+handle.addEventListener("pointercancel", endResize);
+
+// Remember where Zee was put (its bottom-right corner), and come back there if that spot is still on a screen.
+let anchorTimer;
+tauriWindow?.onMoved(() => {
   press = null;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
+  clearTimeout(anchorTimer);
+  anchorTimer = setTimeout(async () => {
     try {
-      localStorage.setItem(POSITION_KEY, JSON.stringify({ x: payload.x, y: payload.y }));
+      save(ANCHOR_KEY, await anchor());
     } catch {
-      // Not saved; Zee returns to the corner next time.
+      // Not remembered.
     }
   }, 300);
 });
 
-restorePosition();
-
-// Resize from the top-left handle; Zee and the bubble scale with the window (see --zee-size).
-const SIZE_KEY = "zee-size";
-$("resize").addEventListener("mousedown", (event) => {
-  if (event.button === 0) tauriWindow?.startResizeDragging("NorthWest");
-});
-
-async function restoreSize() {
+async function restoreWindow() {
   if (!tauriWindow) return;
   try {
-    const saved = JSON.parse(localStorage.getItem(SIZE_KEY) ?? "null");
-    if (saved) await tauriWindow.setSize(new window.__TAURI__.dpi.PhysicalSize(saved.width, saved.height));
+    const saved = load(ANCHOR_KEY);
+    const monitor = await tauriWindow.currentMonitor();
+    let corner = await anchor();
+    if (saved && monitor) {
+      const scale = monitor.scaleFactor;
+      const left = monitor.position.x / scale;
+      const top = monitor.position.y / scale;
+      const right = left + monitor.size.width / scale;
+      const bottom = top + monitor.size.height / scale;
+      const onScreen = saved.right > left + ZEE_BOX && saved.right <= right && saved.bottom > top + ZEE_BOX && saved.bottom <= bottom;
+      if (onScreen) corner = saved;
+    }
+    await placeWindow(corner);
   } catch {
-    // Keep the default size.
+    // Stay where the app placed Zee.
   }
 }
 
-let sizeTimer;
-tauriWindow?.onResized(({ payload }) => {
-  clearTimeout(sizeTimer);
-  sizeTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(SIZE_KEY, JSON.stringify({ width: payload.width, height: payload.height }));
-    } catch {
-      // Not saved; Zee opens at the default size next time.
-    }
-  }, 300);
-});
-
-restoreSize();
+restoreWindow();
 
 $("undo").addEventListener("click", async () => {
   if (!confirm("Put back everything the last run moved?")) return;

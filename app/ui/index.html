@@ -7,16 +7,18 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <button id="resize" type="button" title="Drag to resize" aria-label="Resize Zee"></button>
     <section id="bubble" hidden aria-live="polite">
-      <p id="message">Connecting to Dropzone Zero...</p>
-      <ul id="pending"></ul>
-      <h2 id="recent-title" hidden>Recently filed</h2>
-      <ul id="recent"></ul>
-      <footer>
-        <button id="undo" type="button" title="Put back everything the last run moved">Undo last</button>
-        <button id="pause" type="button">Pause</button>
-      </footer>
+      <div id="bubble-resize" title="Drag to resize the bubble" aria-hidden="true"></div>
+      <div id="bubble-body">
+        <p id="message">Connecting to Dropzone Zero...</p>
+        <ul id="pending"></ul>
+        <h2 id="recent-title" hidden>Recently filed</h2>
+        <ul id="recent"></ul>
+        <footer>
+          <button id="undo" type="button" title="Put back everything the last run moved">Undo last</button>
+          <button id="pause" type="button">Pause</button>
+        </footer>
+      </div>
     </section>
 
     <div id="stage">

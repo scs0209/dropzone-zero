@@ -18,11 +18,7 @@
         "transparent": true,
         "decorations": false,
         "alwaysOnTop": true,
-        "resizable": true,
-        "minWidth": 220,
-        "minHeight": 260,
-        "maxWidth": 720,
-        "maxHeight": 900,
+        "resizable": false,
         "skipTaskbar": true,
         "shadow": false,
         "visibleOnAllWorkspaces": true
