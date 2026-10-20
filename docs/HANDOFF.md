@@ -24,12 +24,12 @@ pnpm test                      # daemon tests bind a local port
 
 Everything in the README, plus: Sentry `gen_ai.chat` spans (checked with a real DSN),
 the Tinker control experiment (`ml/finetune.py`, `dz eval --provider replay`),
-the post draft `docs/dev-post.md`, cover and both GIFs in `docs/media/`.
+the post draft `docs/dev-post.md`, cover and both GIFs in `docs/media/`, and Zee no
+longer shakes while its bubble is resized (checked in the app).
 Backboard, Auth0, and Render were dropped.
 
 ## Open
 
-- **Zee resize shake fix:** the window no longer resizes during a bubble drag; check it by eye after `pnpm app:build`.
 - **Post TODOs:** a Sentry trace screenshot (needs a Sentry login) and the agent
   session link (DevRelay or Entire; choose which sessions may be public).
 - **Numbers to reconcile:** the README says 75% of a real folder went to "other"
