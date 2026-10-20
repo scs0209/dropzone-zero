@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, it } from "node:test";
 import type { ClassifyResult } from "../src/classify.js";
-import { approveItems, loadPlan } from "../src/execute.js";
+import { approveItems, lastUndoableRun, loadPlan, undoRun } from "../src/execute.js";
 import type { ScannedFile } from "../src/scan.js";
 import { fingerprint } from "../src/guard.js";
 import { appleScriptString } from "../src/notify.js";
@@ -129,6 +129,25 @@ describe("watchCycle", () => {
     assert.equal(second.run?.moved, 1);
     assert.ok(existsSync(join(inbox, "old.pdf")), "the backlog stays put");
     assert.ok(existsSync(join(inbox, "Finance/Receipts/2026-10/new.pdf")));
+  });
+
+  it("does not file a download again after an undo put it back", async () => {
+    const state = newWatchState();
+    await watchCycle(state, options({ auto: true }));
+    await arrive("new.pdf");
+    const filed = await watchCycle(state, options({ auto: true }));
+    assert.equal(filed.run?.moved, 1);
+
+    await undoRun(inbox, (await lastUndoableRun(inbox))!);
+    assert.ok(existsSync(join(inbox, "new.pdf")), "undo put it back");
+    const after = await watchCycle(state, options({ auto: true }));
+    assert.equal(after.run, undefined);
+    assert.ok(existsSync(join(inbox, "new.pdf")), "and it stays put");
+
+    // A different file that reuses the name is a new download again.
+    await arrive("new.pdf", "a different receipt");
+    const next = await watchCycle(state, options({ auto: true }));
+    assert.equal(next.run?.moved, 1);
   });
 
   it("a cluttered folder no longer holds up a new download", async () => {

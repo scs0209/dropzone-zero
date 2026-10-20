@@ -35,8 +35,6 @@ Backboard, Auth0, and Render were dropped.
 - **Numbers to reconcile:** the README says 75% of a real folder went to "other"
   before the new categories; the work notes say 39 of 55 files (about 71%).
   The post uses 39/55 -> 8/55.
-- **`pnpm media:zee`:** clicking an answer in headless Chrome stalls its renderer,
-  so the GIF ends on Zee's question. Cause not found; not seen in the app.
 - Not done: ElevenLabs, .ics follow-up, .tech domain.
 
 ## Conventions

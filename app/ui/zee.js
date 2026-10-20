@@ -343,8 +343,26 @@ $("hide").addEventListener("click", () => {
   window.__TAURI__?.core.invoke("set_zee_visible", { visible: false }).catch(showError);
 });
 
-$("undo").addEventListener("click", async () => {
-  if (!confirm("Put back everything the last run moved?")) return;
+// Undo asks first, inside the bubble: the first click turns the button into
+// "Put back?", and a second click within a few seconds does it. (window.confirm()
+// cannot be used: Zee's webview on macOS shows no JavaScript dialogs, so it
+// returned false at once and Undo silently did nothing.)
+const undoButton = $("undo");
+let undoArmed = null;
+function disarmUndo() {
+  clearTimeout(undoArmed);
+  undoArmed = null;
+  undoButton.textContent = "Undo last";
+  undoButton.classList.remove("armed");
+}
+undoButton.addEventListener("click", async () => {
+  if (!undoArmed) {
+    undoButton.textContent = "Put back?";
+    undoButton.classList.add("armed");
+    undoArmed = setTimeout(disarmUndo, 4_000);
+    return;
+  }
+  disarmUndo();
   try {
     render(await call("POST", "/undo"));
   } catch (error) {

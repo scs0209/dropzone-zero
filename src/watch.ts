@@ -1,6 +1,7 @@
 import { watch } from "node:fs";
 import type { ClassifyResult } from "./classify.js";
 import { executePlan, loadPlan, movableItems, savePlan, type RunResult } from "./execute.js";
+import { readJournal } from "./journal.js";
 import { batchNeedsApproval, fingerprint } from "./guard.js";
 import { buildPlan, type PlanItem } from "./plan.js";
 import { applyReviewGate, type Predictor } from "./review.js";
@@ -89,6 +90,25 @@ async function carryOverApprovals(inbox: string, plan: PlanItem[]): Promise<void
   }
 }
 
+/**
+ * Files an undo put back, as name and hash. They are where the person wants them,
+ * so --auto must not take them for new downloads and file them again (which made
+ * Undo look like it did nothing). The hash pins the exact file: a new download
+ * that reuses the name is still new.
+ */
+async function putBackByUndo(inbox: string): Promise<Set<string>> {
+  const entries = await readJournal(inbox);
+  const hashes = new Map<string, string>();
+  for (const e of entries) if (e.op === "move") hashes.set(`${e.run}\n${e.to}`, e.sha256);
+  const keys = new Set<string>();
+  for (const e of entries) {
+    if (e.op !== "restore" || e.state !== "done") continue;
+    const sha = hashes.get(`${e.run}\n${e.from}`);
+    if (sha) keys.add(`${e.to}\n${sha}`);
+  }
+  return keys;
+}
+
 /** One pass: scan, plan what has settled, save the plan, and with --auto run what the guard allows. */
 export async function watchCycle(state: WatchState, options: WatchOptions): Promise<CycleResult> {
   const { inbox, settleMs = DEFAULT_SETTLE_MS, now = Date.now } = options;
@@ -104,8 +124,12 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
 
   // In --auto mode the files that were already here are left alone, so they are not
   // even sent to the model: a new download never waits behind a cluttered folder.
-  const isNewFile = (f: { name: string; sha256: string }) => !state.baseline!.has(`${f.name}\n${f.sha256}`);
   const leaveExisting = options.auto && !options.includeExisting;
+  const putBack = leaveExisting ? await putBackByUndo(inbox) : new Set<string>();
+  const isNewFile = (f: { name: string; sha256: string }) => {
+    const key = `${f.name}\n${f.sha256}`;
+    return !state.baseline!.has(key) && !putBack.has(key);
+  };
   const candidates = leaveExisting ? settled.filter(isNewFile) : settled;
   let newlyClassified = 0;
   const plan = await buildPlan(candidates, {

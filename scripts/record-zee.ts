@@ -1,5 +1,5 @@
 // Records docs/media/zee.gif: Zee, the real UI against a real daemon, filing a new
-// download in a synthetic folder and then asking about an installer. Zee runs in headless Chrome (the daemon already
+// download in a synthetic folder, asking about an installer, and undoing the filing. Zee runs in headless Chrome (the daemon already
 // accepts the Tauri dev origin, http://localhost:1420), frames are captured over the
 // DevTools protocol, and ffmpeg encodes the GIF. Nothing touches ~/Downloads or the
 // daemon Zee.app runs: this daemon uses a free port and a temporary info file.
@@ -59,7 +59,7 @@ async function download(name: string): Promise<void> {
   await utimes(to, now, now);
 }
 
-type ZeeState = { mood: string; pending: { id: string }[]; recent: unknown[] };
+type ZeeState = { mood: string; message: string; pending: { id: string }[]; recent: unknown[] };
 
 async function state(): Promise<ZeeState> {
   const res = await fetch(`http://127.0.0.1:${daemon.port}/state`, { headers: { "x-dz-token": token } });
@@ -178,6 +178,8 @@ const capture = (async () => {
 })();
 
 const click = (selector: string) => run(`document.querySelector(${JSON.stringify(selector)})?.click()`);
+const clickText = (text: string) =>
+  run(`[...document.querySelectorAll("button")].find((b) => b.textContent.trim() === ${JSON.stringify(text)})?.click()`);
 
 try {
   await waitFor((s) => s.mood === "sleeping");
@@ -197,9 +199,19 @@ try {
   await download("Notely-4.2.1.dmg");
   await waitFor((s) => s.mood === "asking", 60_000);
   log("asking");
-  // End on the question. (Clicking an answer in headless Chrome stalls its
-  // renderer; the terminal GIF shows undo.)
-  await sleep(4_000);
+  await sleep(3_000);
+  log("leave it");
+  await clickText("Leave it");
+  await sleep(2_500);
+
+  // 3. Changed your mind about the receipt? Undo asks once in the bubble, then puts it back.
+  log("undo");
+  await click("#undo");
+  await sleep(1_500);
+  await click("#undo");
+  await waitFor((s) => s.message.startsWith("Put back"), 15_000);
+  log("put back");
+  await sleep(3_000);
 } catch (error) {
   console.error(`Scene stopped early: ${(error as Error).message}`);
 } finally {

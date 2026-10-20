@@ -34,7 +34,7 @@ Nine synthetic downloads, start to finish: Gemma plans every file, the guard hol
 
 ![Dropzone Zero in the terminal: preview, run, and undo on nine synthetic downloads](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/demo.gif)
 
-And here is Zee, the real app UI against a real daemon, as two synthetic downloads land: it reads the receipt, files it (that open mouth is it eating the page), and then waves and asks before touching an installer.
+And here is Zee, the real app UI against a real daemon, as two synthetic downloads land: it reads the receipt, files it (that open mouth is it eating the page), waves and asks before touching an installer, and then puts the receipt back with **Undo last**.
 
 ![Zee reading a new receipt, filing it, and then asking about an installer](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/zee.gif)
 
