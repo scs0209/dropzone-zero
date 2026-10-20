@@ -47,6 +47,12 @@ const eyes = [-0.28, 0.28].map((x) => {
   return eye;
 });
 
+// A mouth on the screen face, shown while eating: an oval that opens and closes.
+const MOUTH_Y = -0.2;
+const mouth = mesh(new THREE.TorusGeometry(0.11, 0.03, 8, 32), eyeMat, 0, MOUTH_Y, 0.69);
+mouth.scale.x = 1.35;
+head.add(mouth);
+
 head.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 12), clay(0x7d8a94), 0, 0.95, 0));
 const bulbMat = new THREE.MeshStandardMaterial({ color: 0x9fb0b8, emissive: 0x000000, roughness: 0.3 });
 head.add(mesh(new THREE.SphereGeometry(0.13, 24, 16), bulbMat, 0, 1.25, 0));
@@ -127,10 +133,13 @@ function frame() {
   arm.visible = mood === "asking";
   if (arm.visible) arm.rotation.z = Math.sin(t * 6) * 0.35;
 
+  mouth.visible = mood === "eating";
+  if (mouth.visible) mouth.scale.y = 0.2 + Math.abs(Math.sin(t * 9)) * 0.9;
   page.visible = mood === "eating";
   if (page.visible) {
     const p = (t * 0.9) % 1;
-    page.position.set(1.6 - p * 1.6, 2.2 - p * 1.3, 0.6);
+    // From the upper right straight into the mouth.
+    page.position.set(1.6 - p * 1.6, 2.2 - p * (2.2 - (0.95 + MOUTH_Y)), 0.6 + p * 0.15);
     page.rotation.z = p * 3;
     page.scale.setScalar(1 - p * 0.7);
     head.scale.y = 1 + Math.sin(t * 18) * 0.04;
