@@ -21,7 +21,9 @@
     "app": "node scripts/vendor-three.mjs && tauri dev --config app/src-tauri/tauri.conf.json",
     "app:build": "node scripts/vendor-three.mjs && tauri build --config app/src-tauri/tauri.conf.json",
     "app:vendor": "node scripts/vendor-three.mjs",
-    "eval:make": "node --import tsx scripts/make-eval.ts"
+    "eval:make": "node --import tsx scripts/make-eval.ts",
+    "media:demo": "bash scripts/make-demo-gif.sh",
+    "media:cover": "bash scripts/make-cover.sh"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.1",

@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+  The DEV cover image (1000x420). It renders the real Zee robot from app/ui, so
+  the cover shows the app as it is. Rebuild with: pnpm media:cover
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dropzone Zero cover</title>
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --ink: #1f2a30;
+        --muted: #5b6870;
+        --accent: #1d9e75;
+        --card: #ffffff;
+        --line: #d9d3c7;
+      }
+      * { box-sizing: border-box; margin: 0; }
+      html, body { width: 1000px; height: 420px; overflow: hidden; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+        display: grid;
+        grid-template-columns: 560px 440px;
+      }
+      .copy { padding: 58px 0 0 64px; }
+      .eyebrow {
+        font-size: 15px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--accent);
+      }
+      h1 { font-size: 64px; line-height: 1.02; letter-spacing: -0.02em; margin-top: 14px; }
+      p.tag { font-size: 23px; line-height: 1.35; color: var(--muted); margin-top: 18px; max-width: 470px; }
+      .chips { display: flex; gap: 10px; margin-top: 30px; }
+      .chip {
+        font-size: 14px; font-weight: 600; padding: 7px 12px; border-radius: 999px; white-space: nowrap;
+        background: var(--card); border: 1px solid var(--line);
+      }
+      .chip b { color: var(--accent); }
+      .scene { position: relative; }
+      #robot { position: absolute; left: 60px; top: 70px; width: 300px; height: 300px; }
+      .file {
+        position: absolute; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+        font: 600 13px ui-monospace, "SF Mono", Menlo, monospace; padding: 8px 11px; color: var(--ink);
+        box-shadow: 0 6px 18px rgba(31, 42, 48, 0.08);
+      }
+      .file small { display: block; font-weight: 500; color: var(--accent); margin-top: 3px; }
+      .f1 { left: 236px; top: 40px; transform: rotate(3deg); }
+      .f2 { left: 14px; top: 58px; transform: rotate(-4deg); }
+      .f3 { left: 250px; top: 318px; transform: rotate(-2deg); }
+    </style>
+  </head>
+  <body class="eating">
+    <section class="copy">
+      <div class="eyebrow">Slow and steady · open-weight AI</div>
+      <h1>Dropzone Zero</h1>
+      <p class="tag">A local Gemma agent that files your Downloads folder, and puts every file back with one click.</p>
+      <div class="chips">
+        <span class="chip"><b>Gemma 4</b>, local</span>
+        <span class="chip">SHA-256 verified</span>
+        <span class="chip">Undo anything</span>
+      </div>
+    </section>
+    <section class="scene">
+      <canvas id="robot"></canvas>
+      <div class="file f2">scan0001.pdf<small>→ Finance/Receipts</small></div>
+      <div class="file f1">IMG_2041.jpg<small>→ receipt, 2026-10-11</small></div>
+      <div class="file f3">invite.ics<small>→ Calendar</small></div>
+    </section>
+    <script type="module" src="../../app/ui/robot.js"></script>
+  </body>
+</html>

@@ -87,6 +87,15 @@ function expandHome(path: string): string {
   return path.startsWith("~") ? homedir() + path.slice(1) : path;
 }
 
+/** A folder as the user would type it: relative to where they are, or under ~, so output can be shared as is. */
+function displayFolder(folder: string): string {
+  const here = relative(process.cwd(), folder);
+  if (!here) return ".";
+  if (!here.startsWith("..")) return here;
+  const home = homedir();
+  return folder === home || folder.startsWith(home + "/") ? "~" + folder.slice(home.length) : folder;
+}
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -113,7 +122,7 @@ function itemNote(item: PlanItem): string {
 
 function printPlan(plan: PlanItem[], folder: string, gate: GateResult, hints = true): void {
   const counts = summarize(plan);
-  console.log(`Plan for ${plan.length} files in ${folder} (preview only, nothing was moved)\n`);
+  console.log(`Plan for ${plan.length} files in ${displayFolder(folder)} (preview only, nothing was moved)\n`);
   console.log(["VERDICT", "ACTION".padEnd(10), "CONF", "CATEGORY".padEnd(12), "FILE".padEnd(38), "NEW PATH"].join("  "));
   const sorted = [...plan].sort(
     (a, b) =>
@@ -714,7 +723,7 @@ async function scan(folder: string, json: boolean): Promise<void> {
     return;
   }
 
-  console.log(`${files.length} files in ${folder}\n`);
+  console.log(`${files.length} files in ${displayFolder(folder)}\n`);
   for (const file of files) {
     const flags = flagsOf(file);
     console.log(

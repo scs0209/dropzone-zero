@@ -2,6 +2,7 @@
 title: Dropzone Zero: a sloth-speed Gemma agent that files my Downloads and can put it all back
 published: false
 tags: devchallenge, hf26challenge, ai, opensource
+cover_image: https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/cover.png
 ---
 
 *This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 3: Slow and Steady](https://dev.to/challenges/hacktoberfest-week3-2026-10-19)*
@@ -29,7 +30,11 @@ The sloth part is the philosophy. An agent that moves your files should be slow 
 
 ## Demo
 
-<!-- TODO: embed the demo video here (Zee filing a fresh download, then Undo last). -->
+Nine synthetic downloads, start to finish: Gemma plans every file, the guard holds the installer for review, the duplicate and the temp file go to quarantine, the half-finished download is left alone, every move is checked by SHA-256, and one `dz undo` puts the folder back exactly as it was.
+
+![Dropzone Zero in the terminal: preview, run, and undo on nine synthetic downloads](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/demo.gif)
+
+<!-- TODO: add a short screen recording of Zee filing a fresh Chrome download, then Undo last. -->
 
 ## Code
 
