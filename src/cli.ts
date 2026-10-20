@@ -25,6 +25,7 @@ import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
 import { extractReceipt, findReceiptFiles, toCsv, type ReceiptRow } from "./receipts.js";
 import { applyReviewGate, type GateResult } from "./review.js";
+import { countStates, latestRun, plannedStates, runStates, type ItemStatus } from "./status.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
 import { captureError, flushTelemetry, initTelemetry, recordCounts, recordDuration, withSpan } from "./telemetry.js";
 
@@ -42,6 +43,7 @@ Usage:
                                  Put back single files; the review gate learns from it
   dz approve [folder] --file <name> | --all
                                  Release items the guard holds for review
+  dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
                                  Export vendor, date, and total of receipts and invoices to CSV
@@ -272,6 +274,32 @@ async function run(folder: string, yes: boolean, temporal: boolean): Promise<voi
   console.log("Changed your mind? `dz undo` puts everything back.");
 }
 
+function formatCounts(counts: Partial<Record<string, number>>): string {
+  return Object.entries(counts).map(([state, n]) => `${state} ${n}`).join(", ") || "nothing";
+}
+
+async function status(folder: string, json: boolean): Promise<void> {
+  const planned = await plannedStates(folder);
+  const run = await latestRun(folder);
+  const ran = run ? await runStates(folder, run) : [];
+  if (json) {
+    process.stdout.write(JSON.stringify({ plan: planned, run: run ? { id: run, items: ran } : null }, null, 2) + "\n");
+    return;
+  }
+  const show = (items: ItemStatus[], states: string[]) => {
+    for (const item of items.filter((i) => states.includes(i.state))) {
+      console.log(`  ${item.state.padEnd(12)}  ${item.name}${item.detail ? `  (${item.detail})` : ""}`);
+    }
+  };
+  console.log(`Saved plan:  ${planned.length ? formatCounts(countStates(planned)) : "none (run \`dz preview\`)"}`);
+  show(planned, ["needs-review", "approved"]);
+  console.log(`Last run:    ${run ? `${run}: ${formatCounts(countStates(ran))}` : "none"}`);
+  show(ran, ["executing", "failed"]);
+  if (ran.some((i) => i.state === "executing")) {
+    console.log("Some moves stopped halfway. `dz worker` finishes a --temporal run; `dz undo` reverses it.");
+  }
+}
+
 async function approve(folder: string, files: string[], all: boolean): Promise<void> {
   if (!all && files.length === 0) throw new Error("Name the files to approve with --file <name>, or pass --all.");
   const { approved, unmatched } = await approveItems(folder, all ? "all" : files);
@@ -398,6 +426,7 @@ async function main(): Promise<void> {
   if (command === "run") return run(folder, values.yes ?? false, values.temporal ?? false);
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
+  if (command === "status") return status(folder, json);
   if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
   if (command === "receipts") return receipts(folder, values.out);
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");

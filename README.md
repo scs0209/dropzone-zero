@@ -40,6 +40,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz undo [folder]` | Reverses the most recent run: files go back to their old names and places, and folders the run created are removed if empty |
 | `dz undo [folder] --file <name>` | Moves single files from the last run back (by old name, new name, or new path) and teaches the review gate that this move was wrong |
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
+| `dz status [folder]` | Shows where every file stands: planned, needs review, approved, blocked, executing, verified, failed, or restored |
 | `dz approve [folder] --file <name>` | Releases an item the guard holds for review, for exactly the move shown (`--all` releases every review item) |
 | `dz receipts [folder]` | Reads every receipt and invoice and writes date, vendor, total, currency, and document number to a CSV |
 
@@ -68,6 +69,8 @@ The executor does not trust the plan file either. Right before each rename it ju
 - the saved plan carries a SHA-256 digest, and a plan edited by anything but Dropzone Zero is refused.
 
 Runs of more than 20 allowed moves (`DZ_BULK_LIMIT`) are reported as bulk changes, which is where a second approval step plugs in.
+
+Each file moves through explicit states: `planned` or `needs-review` → `approved` → `executing` → `verified` (or `failed`), and `restored` after an undo; `blocked` never moves. The states are replayed from the saved plan and the append-only journal rather than stored separately, so they cannot drift from what actually happened. A file left in `executing` means a run stopped between the rename and its check, and `dz status` says how to finish or reverse it.
 
 ## How a run stays safe
 
