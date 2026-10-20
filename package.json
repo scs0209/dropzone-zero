@@ -9,10 +9,10 @@
     "dz": "./dist/cli.js"
   },
   "engines": {
-    "node": ">=22.2"
+    "node": ">=22.9"
   },
   "scripts": {
-    "dz": "node --import tsx src/cli.ts",
+    "dz": "node --env-file-if-exists=.env --import tsx src/cli.ts",
     "seed": "node --import tsx scripts/seed-demo.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json",

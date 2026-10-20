@@ -15,7 +15,7 @@ Receipts, booking confirmations, photos, manuals, and half-finished downloads pi
 
 ## Quick start
 
-Requires Node.js 22.2 or newer, [pnpm](https://pnpm.io), and [Ollama](https://ollama.com) for the local model. The optional review gate also needs [uv](https://docs.astral.sh/uv/).
+Requires Node.js 22.9 or newer, [pnpm](https://pnpm.io), and [Ollama](https://ollama.com) for the local model. The optional review gate also needs [uv](https://docs.astral.sh/uv/).
 
 ```bash
 pnpm install
