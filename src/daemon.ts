@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -18,6 +19,8 @@ import { startWatching, type CycleResult, type WatchControl, type WatchOptions }
 // every command.
 
 export const DEFAULT_DAEMON_PORT = 47623;
+/** Enough history that Zee can still show a full list after some files were deleted or undone. */
+const RECENT_LIMIT = 30;
 
 export function daemonInfoPath(): string {
   return join(homedir(), ".dropzone-zero", "daemon.json");
@@ -99,7 +102,10 @@ export class Daemon {
               : this.settling
                 ? ["thinking", `Waiting for ${this.settling === 1 ? "a download" : `${this.settling} downloads`} to finish...`]
                 : ["sleeping", this.lastMessage];
-    return { folder: this.options.folder, mood, message, pending: this.pending, recent: this.recent, lastRun: this.lastRun };
+    // Re-check that each file is still where it was filed: a person may have deleted or moved
+    // it since, and that happens inside subfolders the watcher does not look at.
+    const recent = this.recent.map((move) => ({ ...move, present: existsSync(join(this.options.folder, move.to)) }));
+    return { folder: this.options.folder, mood, message, pending: this.pending, recent, lastRun: this.lastRun };
   }
 
   /** The port the API listens on, once started. */
@@ -117,7 +123,7 @@ export class Daemon {
     const infoPath = this.options.infoPath ?? daemonInfoPath();
     await mkdir(dirname(infoPath), { recursive: true, mode: 0o700 });
     await writeFile(infoPath, JSON.stringify({ port: this.port, token: this.token, pid: process.pid, folder: this.options.folder }), { mode: 0o600 });
-    this.recent = await recentMoves(this.options.folder, 8);
+    this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
     await this.options.waitForModel();
     this.dizzy = null;
     this.startWatcher();
@@ -160,7 +166,7 @@ export class Daemon {
       this.lastMessage = `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}.`;
     }
     // Every pass, not only after its own moves: the journal is the record, whoever wrote it.
-    this.recent = await recentMoves(this.options.folder, 8);
+    this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
     for (const item of result.needsDecision?.reviews ?? []) {
       this.pending.push({ kind: "review", id: fingerprint(item), title: `${item.name} → ${item.target}`, detail: item.checks.join("; ") });
     }
@@ -213,7 +219,7 @@ export class Daemon {
         const run = await lastUndoableRun(this.options.folder);
         if (!run) return send(res, 200, { ...this.state(), message: "Nothing to undo." });
         const result = await undoRun(this.options.folder, run);
-        this.recent = await recentMoves(this.options.folder, 8);
+        this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
         this.lastMessage = `Put back ${result.restored} ${result.restored === 1 ? "file" : "files"}.`;
         return send(res, 200, this.state());
       }

@@ -62,7 +62,8 @@ function render(state) {
     drawnPending = pendingKey;
     drawPending(state.pending);
   }
-  const recent = state.recent.filter((m) => m.current).slice(0, 8);
+  // Only files that are still where Zee put them: not undone, not deleted or moved away since.
+  const recent = state.recent.filter((m) => m.current && m.present).slice(0, 8);
   $("empty").hidden = recent.length > 0 || state.pending.length > 0;
   const recentKey = JSON.stringify(recent);
   if (recentKey !== drawnRecent) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -141,6 +141,10 @@ describe("dz daemon moods", () => {
       assert.equal(slow.state().message, "Reading receipt.pdf...");
       finishReading();
       await until(async () => slow.state().mood === "eating");
+      // Deleted by hand inside its new folder: the next state already says it is gone.
+      assert.equal(slow.state().recent[0]?.present, true);
+      await rm(join(folder, slow.state().recent[0]!.to));
+      assert.equal(slow.state().recent[0]?.present, false);
     } finally {
       finishReading();
       await slow.stop();
