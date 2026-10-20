@@ -50,6 +50,8 @@ Usage:
                                  Keep planning as files arrive; --auto moves new files the guard
                                  allows and asks you, right there, about the rest
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
+  dz autostart enable [folder] | disable | status
+                                 Start dz watch --auto at login (macOS LaunchAgent)
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
                                  Export vendor, date, and total of receipts and invoices to CSV
@@ -380,9 +382,25 @@ function printCycle(result: CycleResult): void {
   }
 }
 
+/**
+ * Waits until Ollama answers. Started at login, the watcher can come up before
+ * Ollama does; a missing model, though, will not fix itself, so that still fails.
+ */
+async function waitForOllama(client: OllamaClient): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await client.ensureReady();
+    } catch (error) {
+      if (!(error instanceof OllamaUnavailableError) || !error.message.startsWith("Cannot reach")) throw error;
+      if (attempt === 0) console.log(`${error.message} Waiting for it...`);
+      await new Promise((resolveWait) => setTimeout(resolveWait, 15_000));
+    }
+  }
+}
+
 async function watchFolder(folder: string, auto: boolean, includeExisting: boolean): Promise<void> {
   const client = new OllamaClient();
-  await client.ensureReady();
+  await waitForOllama(client);
   console.log(
     `Watching ${folder}. ${
       auto
@@ -400,7 +418,9 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
 
   const onDecision = (decision: NonNullable<CycleResult["needsDecision"]>) => {
     const count = decision.reviews.length + (decision.batch ? 1 : 0);
-    notify("Dropzone Zero", `${count === 1 ? "A new download needs" : `${count} decisions need`} your OK in the dz watch terminal.`);
+    const what = count === 1 ? "A new download needs" : `${count} decisions need`;
+    // In the background (started at login) there is no terminal to answer in.
+    notify("Dropzone Zero", rl ? `${what} your OK in the dz watch terminal.` : `${what} your OK. Run dz status to see it.`);
     if (!rl) {
       console.log("  Approve with `dz approve --file <name>` or `dz run` in another terminal.");
       return;
@@ -440,6 +460,36 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
       resolveStop();
     });
   });
+}
+
+async function autostart(action: string | undefined, folderArg: string | undefined): Promise<void> {
+  const { autostartStatus, disableAutostart, enableAutostart } = await import("./autostart.js");
+  if (action === "enable") {
+    const folder = resolve(expandHome(folderArg ?? process.env.DZ_INBOX ?? "~/Downloads"));
+    const paths = await enableAutostart(folder);
+    console.log(`dz watch --auto now starts at login for ${folder}, and is running now.`);
+    console.log(`  LaunchAgent: ${paths.plist}`);
+    console.log(`  Log:         ${paths.log}`);
+    console.log("Decisions arrive as notifications; answer them with `dz status`, `dz approve`, or `dz run`.");
+    console.log("If macOS asks whether node may access your Downloads folder, allow it, or the watcher cannot read it.");
+    return;
+  }
+  if (action === "disable") {
+    const existed = await disableAutostart();
+    console.log(existed ? "Stopped the watcher and removed it from login." : "Autostart was not set up.");
+    return;
+  }
+  if (action === "status") {
+    const status = await autostartStatus();
+    if (!status.installed) {
+      console.log("Autostart is off. Turn it on with `dz autostart enable`.");
+      return;
+    }
+    console.log(`Autostart is on; the watcher is ${status.running ? `running (pid ${status.pid})` : "not running right now"}.`);
+    console.log(`  Log: ${status.log}`);
+    return;
+  }
+  throw new Error("Usage: dz autostart enable [folder] | disable | status");
 }
 
 async function approve(folder: string, files: string[], all: boolean): Promise<void> {
@@ -557,6 +607,7 @@ async function main(): Promise<void> {
     },
   });
   const [command, folderArg] = positionals;
+  if (command === "autostart") return autostart(positionals[1], positionals[2]);
 
   if (values.help || !command) {
     process.stdout.write(USAGE);

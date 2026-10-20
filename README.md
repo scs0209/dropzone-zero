@@ -42,6 +42,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz undo [folder] --file <name>` | Moves single files from the last run back (by old name, new name, or new path) and teaches the review gate that this move was wrong |
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
 | `dz watch [folder] [--auto]` | Keeps planning as files arrive. With `--auto`, allowed moves run on their own; review and blocked items still wait |
+| `dz autostart enable [folder]` | Starts `dz watch --auto` at every login (macOS LaunchAgent); `disable` removes it, `status` shows whether it is running |
 | `dz status [folder]` | Shows where every file stands: planned, needs review, approved, blocked, executing, verified, failed, or restored |
 | `dz approve [folder] --file <name>` | Releases an item the guard holds for review, for exactly the move shown (`--all` releases every review item) |
 | `dz receipts [folder]` | Reads every receipt and invoice and writes date, vendor, total, currency, and document number to a CSV |
@@ -114,7 +115,17 @@ Watch mode does not loosen anything. Without `--auto` it only plans. With it, on
 13:02:00  moved 1 file (run 20261020T040200483Z); `dz undo` reverses it
 ```
 
-The watcher keeps handling new files while a question is open. On macOS a desktop notification says when a download was filed or when a decision is waiting, so you do not have to keep an eye on the terminal (`DZ_NOTIFY=off` silences them; they are shown locally and sent nowhere). Without a terminal to ask in, `dz approve` and `dz run` from another shell do the same job. While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
+The watcher keeps handling new files while a question is open. On macOS a desktop notification says when a download was filed or when a decision is waiting, so you do not have to keep an eye on the terminal (`DZ_NOTIFY=off` silences them; they are shown locally and sent nowhere). Without a terminal to ask in, `dz approve` and `dz run` from another shell do the same job. ### Start at login
+
+```bash
+pnpm dz autostart enable ~/Downloads   # starts now and at every login
+pnpm dz autostart status
+pnpm dz autostart disable              # stops it and removes it from login
+```
+
+This writes a standard per-user LaunchAgent (`~/Library/LaunchAgents/dev.dropzone-zero.watch.plist`), loads it with `launchctl`, and logs to `~/Library/Logs/dropzone-zero/watch.log`. If Ollama is not up yet at login, the watcher waits for it. In the background there is no terminal to ask in, so decisions arrive as notifications and are answered with `dz status`, `dz approve`, or `dz run`. macOS may ask whether node may access your Downloads folder; the watcher needs that permission to read it.
+
+While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
 
 ## How a run stays safe
 
