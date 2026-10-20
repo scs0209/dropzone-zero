@@ -51,7 +51,7 @@ export async function extractContent(file: ScannedFile): Promise<ExtractedConten
   } catch {
     // Damaged or encrypted files fall through to metadata-only classification.
   }
-  // Images: metadata only for now. gemma3 is multimodal, so a later version can
+  // Images: metadata only for now. Gemma 4 is multimodal, so a later version can
   // pass a downscaled copy through Ollama's `images` field to read screenshots and photos.
   return { kind, text: "", truncated: false };
 }

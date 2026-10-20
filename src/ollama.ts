@@ -1,8 +1,9 @@
 import { CLASSIFICATION_SCHEMA, type ModelClient } from "./classify.js";
 
 export const DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434";
-// Ollama resolves a bare "gemma3" to "gemma3:latest"; the explicit 4B tag is what `ollama pull gemma3` fetches.
-export const DEFAULT_MODEL = "gemma3:4b";
+// Gemma 4 E4B: Apache 2.0, multimodal, and small enough for a laptop. Tagged explicitly
+// so a future change to "latest" cannot silently swap the model under the plan.
+export const DEFAULT_MODEL = "gemma4:e4b";
 
 export interface OllamaOptions {
   host?: string;
@@ -51,6 +52,8 @@ export class OllamaClient implements ModelClient {
         prompt,
         stream: false,
         format: CLASSIFICATION_SCHEMA,
+        // Gemma 4 thinks by default; for a one-file classification that costs ~15x the time for no gain.
+        think: false,
         options: { temperature: 0 },
       }),
     });

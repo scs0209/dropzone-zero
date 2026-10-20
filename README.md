@@ -19,13 +19,13 @@ Requires Node.js 22.2 or newer, [pnpm](https://pnpm.io), and [Ollama](https://ol
 
 ```bash
 pnpm install
-ollama pull gemma3:4b   # about 3.3 GB, once
+ollama pull gemma4:e4b  # about 6.6 GB, once
 ollama serve            # skip if the Ollama app is already running
 pnpm seed               # creates demo/inbox with 30 synthetic files
 pnpm dz preview demo/inbox
 ```
 
-On an Apple Silicon laptop the 30-file preview takes under a minute with `gemma3:4b`.
+On an Apple Silicon laptop the 30-file preview takes under a minute with `gemma4:e4b`. Gemma 4 thinks before answering by default; Dropzone Zero turns that off, because for one-file classification it was about 15 times slower with no better answers.
 
 ## Commands
 
@@ -48,7 +48,7 @@ More commands (`run`, `undo`) are on the way.
 | Variable | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | Local Ollama server |
-| `DZ_MODEL` | `gemma3:4b` | Any Ollama model that supports structured output |
+| `DZ_MODEL` | `gemma4:e4b` | Any Ollama model that supports structured output |
 | `SENTRY_DSN` | unset | Optional error and timing reports, see below |
 
 ## Telemetry
@@ -58,7 +58,7 @@ Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves,
 ## Roadmap
 
 - [x] Scan with SHA-256 duplicate detection
-- [x] Local classification with Gemma through Ollama, and `dz preview`
+- [x] Local classification with Gemma 4 through Ollama, and `dz preview`
 - [ ] `dz run`: copy, verify the hash, then move the original, journaling every step (Temporal workflow)
 - [ ] `dz undo` from the journal
 - [ ] Gemma vision for photos and screenshots (Ollama's `images` field)

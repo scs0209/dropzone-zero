@@ -21,7 +21,7 @@ Options:
 Environment:
   DZ_INBOX      Folder to organize (default ~/Downloads)
   OLLAMA_HOST   Ollama server (default http://127.0.0.1:11434)
-  DZ_MODEL      Ollama model (default gemma3:4b)
+  DZ_MODEL      Ollama model (default gemma4:e4b)
   SENTRY_DSN    Optional; sends only aggregate counts and timings
 `;
 

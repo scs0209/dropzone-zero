@@ -94,7 +94,7 @@ const FOLDERS: Record<Category, { base: string; monthly: boolean }> = {
 export function buildPrompt(file: ScannedFile, content: ExtractedContent): string {
   const body = content.text
     ? `Content${content.truncated ? " (truncated)" : ""}:\n"""\n${content.text}\n"""`
-    : `Content: not available (${content.kind} file). Classify from the name and size, with confidence 0.6 or lower.`;
+    : `Content: not available (${content.kind} file). Classify from the name and size, with confidence 0.6 or lower, and build the title from the file name, keeping identifiers such as IMG_2034.`;
   const guide = CATEGORIES.map((c) => `- ${c}: ${CATEGORY_GUIDE[c]}`).join("\n");
   return `You sort files in a Downloads folder. Read one file and describe it as JSON.
 
