@@ -1,8 +1,8 @@
 <!doctype html>
 <!--
-  The DEV cover image (1000x420): a flat illustration of the idea. Zee hangs from
-  a branch like a sloth, doing nothing, while a messy pile of downloads files
-  itself into folders below. Rebuild with: pnpm media:cover
+  The DEV cover image (1000x420): one scene, no text column. Zee naps in a
+  hammock strung across the frame, the title is woven into the hammock, and
+  below it the downloads file themselves. Rebuild with: pnpm media:cover
 -->
 <html lang="en">
   <head>
@@ -10,93 +10,92 @@
     <title>Dropzone Zero cover</title>
     <style>
       * { margin: 0; }
-      html, body { width: 1000px; height: 420px; overflow: hidden; background: #f6ebdc; }
+      html, body { width: 1000px; height: 420px; overflow: hidden; background: #f6e4cc; }
       svg { display: block; }
-      .title { font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; font-weight: 800; }
+      .type { font-family: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; font-weight: 800; }
     </style>
   </head>
   <body>
     <svg width="1000" height="420" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
-      <!-- Sky, sun, and ground -->
-      <rect width="1000" height="420" fill="#f6ebdc" />
-      <circle cx="610" cy="120" r="150" fill="#f3d9b8" />
-      <circle cx="610" cy="120" r="96" fill="#f0c99a" opacity="0.55" />
-      <path d="M0 360 C 220 330, 420 350, 560 352 S 860 336, 1000 348 L 1000 420 L 0 420 Z" fill="#e9d2b4" />
-      <path d="M0 384 C 260 366, 520 392, 760 380 S 940 372, 1000 378 L 1000 420 L 0 420 Z" fill="#dfc29d" />
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#f9eedf" />
+          <stop offset="1" stop-color="#f2d3ae" />
+        </linearGradient>
+        <!-- the middle of the hammock fabric, which the title follows -->
+        <path id="weave" d="M150 196 Q 500 392 850 196" />
+      </defs>
 
-      <!-- Title only -->
-      <text class="title" x="58" y="196" font-size="88" fill="#2b2420" letter-spacing="-2">Dropzone</text>
-      <text class="title" x="58" y="290" font-size="88" fill="#c8623f" letter-spacing="-2">Zero</text>
+      <rect width="1000" height="420" fill="url(#sky)" />
+      <circle cx="500" cy="96" r="128" fill="#f6d2a3" opacity="0.7" />
+      <circle cx="500" cy="96" r="78" fill="#f2bd82" opacity="0.45" />
 
-      <!-- Branch with leaves, coming in from the top right -->
-      <path d="M1010 58 C 900 66, 820 52, 700 70 S 560 96, 512 88" stroke="#7a5236" stroke-width="18" fill="none" stroke-linecap="round" />
-      <path d="M760 63 C 776 40, 792 30, 812 24" stroke="#7a5236" stroke-width="8" fill="none" stroke-linecap="round" />
+      <!-- ground -->
+      <path d="M0 372 C 200 352, 380 366, 520 362 S 840 350, 1000 360 L 1000 420 L 0 420 Z" fill="#e3c39c" />
+
+      <!-- two trees holding the hammock, cropped by the frame -->
+      <path d="M36 420 C 46 300, 52 180, 40 40 L 84 40 C 96 180, 92 300, 100 420 Z" fill="#7a5236" />
+      <path d="M900 420 C 908 300, 904 180, 916 40 L 960 40 C 948 180, 954 300, 964 420 Z" fill="#7a5236" />
       <g fill="#7fa77f">
-        <ellipse cx="822" cy="22" rx="20" ry="10" transform="rotate(-20 822 22)" />
-        <ellipse cx="560" cy="104" rx="22" ry="10" transform="rotate(28 560 104)" />
-        <ellipse cx="530" cy="70" rx="20" ry="9" transform="rotate(-24 530 70)" />
-        <ellipse cx="930" cy="82" rx="22" ry="10" transform="rotate(18 930 82)" />
+        <circle cx="30" cy="20" r="70" />
+        <circle cx="110" cy="-6" r="62" />
+        <circle cx="960" cy="14" r="74" />
+        <circle cx="880" cy="-10" r="56" />
       </g>
       <g fill="#97bb90">
-        <ellipse cx="900" cy="44" rx="18" ry="8" transform="rotate(-14 900 44)" />
-        <ellipse cx="626" cy="64" rx="18" ry="8" transform="rotate(-30 626 64)" />
+        <circle cx="80" cy="44" r="34" />
+        <circle cx="924" cy="50" r="32" />
       </g>
 
-      <!-- Zee, hanging like a sloth: arms up to the branch, eyes closed, perfectly content -->
-      <g transform="rotate(-6 690 180)">
-        <path d="M660 160 C 650 120, 652 96, 660 76" stroke="#b8c2c8" stroke-width="14" fill="none" stroke-linecap="round" />
-        <path d="M722 160 C 734 120, 736 98, 730 74" stroke="#b8c2c8" stroke-width="14" fill="none" stroke-linecap="round" />
-        <circle cx="660" cy="74" r="11" fill="#a9b4ba" />
-        <circle cx="730" cy="72" r="11" fill="#a9b4ba" />
-        <!-- antenna -->
-        <line x1="691" y1="140" x2="691" y2="118" stroke="#6c7a82" stroke-width="5" stroke-linecap="round" />
-        <circle cx="691" cy="114" r="7" fill="#1d9e75" />
-        <!-- head with screen face -->
-        <rect x="636" y="138" width="110" height="92" rx="24" fill="#d7dee3" />
-        <rect x="650" y="151" width="82" height="62" rx="12" fill="#1f2a30" />
-        <path d="M664 180 q 9 -9 18 0" stroke="#5dcaa5" stroke-width="5" fill="none" stroke-linecap="round" />
-        <path d="M700 180 q 9 -9 18 0" stroke="#5dcaa5" stroke-width="5" fill="none" stroke-linecap="round" />
-        <path d="M681 196 q 10 8 20 0" stroke="#5dcaa5" stroke-width="4" fill="none" stroke-linecap="round" />
-        <!-- body and dangling wheels -->
-        <rect x="656" y="226" width="70" height="44" rx="14" fill="#c5ced4" />
-        <rect x="664" y="266" width="14" height="18" rx="5" fill="#6c7a82" />
-        <rect x="704" y="266" width="14" height="18" rx="5" fill="#6c7a82" />
+      <!-- ropes -->
+      <path d="M80 140 L 150 186 M80 140 L 152 206" stroke="#a07c56" stroke-width="4" stroke-linecap="round" />
+      <path d="M920 140 L 850 186 M920 140 L 848 206" stroke="#a07c56" stroke-width="4" stroke-linecap="round" />
+
+      <!-- Zee lying in the hammock, only the head and one arm show over the edge -->
+      <g transform="rotate(-14 470 236)">
+        <line x1="438" y1="186" x2="424" y2="166" stroke="#6c7a82" stroke-width="5" stroke-linecap="round" />
+        <circle cx="421" cy="162" r="7" fill="#1d9e75" />
+        <rect x="408" y="184" width="104" height="86" rx="22" fill="#d7dee3" />
+        <rect x="421" y="196" width="78" height="58" rx="11" fill="#1f2a30" />
+        <path d="M434 224 q 8 -8 16 0" stroke="#5dcaa5" stroke-width="5" fill="none" stroke-linecap="round" />
+        <path d="M468 224 q 8 -8 16 0" stroke="#5dcaa5" stroke-width="5" fill="none" stroke-linecap="round" />
+        <path d="M451 238 q 8 6 16 0" stroke="#5dcaa5" stroke-width="4" fill="none" stroke-linecap="round" />
       </g>
-      <!-- z z z -->
-      <g class="title" fill="#8b7a6a">
-        <text x="770" y="150" font-size="22">z</text>
-        <text x="790" y="128" font-size="28">z</text>
-        <text x="816" y="100" font-size="34">z</text>
+      <!-- an arm dangling over the side -->
+      <path d="M560 262 C 574 290, 578 318, 572 342" stroke="#b8c2c8" stroke-width="13" fill="none" stroke-linecap="round" />
+      <circle cx="571" cy="346" r="10" fill="#a9b4ba" />
+
+      <!-- the hammock fabric, with the title woven in -->
+      <path d="M150 186 Q 500 366 850 186 L 852 206 Q 500 420 148 206 Z" fill="#c8623f" />
+      <path d="M150 186 Q 500 366 850 186" stroke="#e48a63" stroke-width="5" fill="none" />
+      <path d="M148 206 Q 500 420 852 206" stroke="#a84e30" stroke-width="5" fill="none" />
+      <text class="type" font-size="40" fill="#fbefe2" letter-spacing="3" dy="14">
+        <textPath href="#weave" startOffset="50%" text-anchor="middle">DROPZONE ZERO</textPath>
+      </text>
+
+      <!-- z z z drifting up from Zee -->
+      <g class="type" fill="#8b6f58">
+        <text x="364" y="170" font-size="20">z</text>
+        <text x="338" y="140" font-size="26">z</text>
+        <text x="306" y="104" font-size="32">z</text>
       </g>
 
-      <!-- The messy pile of downloads -->
+      <!-- under the hammock: the messy pile sorts itself -->
       <g>
-        <rect x="514" y="318" width="52" height="64" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(-14 540 350)" />
-        <rect x="548" y="322" width="52" height="64" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(10 574 354)" />
-        <rect x="528" y="330" width="52" height="64" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(-3 554 362)" />
-        <g stroke="#d8c3a5" stroke-width="3" stroke-linecap="round">
-          <line x1="538" y1="346" x2="568" y2="346" />
-          <line x1="538" y1="358" x2="572" y2="358" />
-          <line x1="538" y1="370" x2="560" y2="370" />
-        </g>
-        <rect x="588" y="352" width="34" height="34" rx="6" fill="#e3b04b" transform="rotate(12 605 369)" />
-        <circle cx="600" cy="364" r="5" fill="#fffaf2" />
+        <rect x="214" y="330" width="46" height="56" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(-16 237 358)" />
+        <rect x="244" y="334" width="46" height="56" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(12 267 362)" />
+        <rect x="228" y="342" width="46" height="56" rx="5" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(-4 251 370)" />
+        <rect x="282" y="362" width="28" height="28" rx="5" fill="#e3b04b" transform="rotate(14 296 376)" />
       </g>
-
-      <!-- Papers lifting off the pile and arcing into folders -->
-      <path d="M594 330 C 660 296, 760 292, 834 318" stroke="#c9a77f" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round" fill="none" />
-      <g>
-        <rect x="630" y="292" width="26" height="33" rx="4" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(-18 643 308)" />
-        <rect x="740" y="286" width="26" height="33" rx="4" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(8 753 302)" />
-        <rect x="796" y="290" width="26" height="33" rx="4" fill="#fffaf2" stroke="#d8c3a5" stroke-width="2" transform="rotate(24 809 306)" />
+      <path d="M296 340 C 380 318, 470 380, 560 384 S 690 352, 744 356" stroke="#c9a77f" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round" fill="none" />
+      <g fill="#fffaf2" stroke="#d8c3a5" stroke-width="2">
+        <rect x="352" y="318" width="22" height="28" rx="3" transform="rotate(-12 363 332)" />
+        <rect x="470" y="360" width="22" height="28" rx="3" transform="rotate(10 481 374)" />
+        <rect x="640" y="352" width="22" height="28" rx="3" transform="rotate(-6 651 366)" />
       </g>
-
-      <!-- Neat folders -->
       <g>
-        <path d="M800 312 h 30 l 8 10 h 52 a 8 8 0 0 1 8 8 v 48 a 8 8 0 0 1 -8 8 h -82 a 8 8 0 0 1 -8 -8 v -58 a 8 8 0 0 1 8 -8 z" fill="#c8623f" />
-        <path d="M858 300 h 30 l 8 10 h 52 a 8 8 0 0 1 8 8 v 60 a 8 8 0 0 1 -8 8 h -82 a 8 8 0 0 1 -8 -8 v -70 a 8 8 0 0 1 8 -8 z" fill="#e3b04b" />
-        <path d="M912 316 h 26 l 8 10 h 40 a 8 8 0 0 1 8 8 v 44 a 8 8 0 0 1 -8 8 h -66 a 8 8 0 0 1 -8 -8 v -54 a 8 8 0 0 1 8 -8 z" fill="#7fa77f" />
-        <rect x="868" y="322" width="70" height="8" rx="3" fill="#fffaf2" opacity="0.7" />
+        <path d="M730 338 h 24 l 7 9 h 40 a 7 7 0 0 1 7 7 v 34 a 7 7 0 0 1 -7 7 h -64 a 7 7 0 0 1 -7 -7 v -43 a 7 7 0 0 1 7 -7 z" fill="#e3b04b" />
+        <path d="M780 346 h 22 l 7 9 h 36 a 7 7 0 0 1 7 7 v 30 a 7 7 0 0 1 -7 7 h -58 a 7 7 0 0 1 -7 -7 v -39 a 7 7 0 0 1 7 -7 z" fill="#7fa77f" />
       </g>
     </svg>
   </body>
