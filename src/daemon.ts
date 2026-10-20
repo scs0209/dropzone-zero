@@ -84,6 +84,9 @@ export class Daemon {
   private recent: RecentMove[] = [];
   private lastRun: DaemonState["lastRun"] = null;
   private lastMessage = "Watching for new downloads.";
+  /** Resolves after the watcher's first pass, which records the files already in the folder. */
+  private firstPass!: Promise<void>;
+  private firstPassDone: () => void = () => {};
 
   constructor(private readonly options: DaemonOptions) {}
 
@@ -135,7 +138,16 @@ export class Daemon {
     await rm(this.options.infoPath ?? daemonInfoPath(), { force: true });
   }
 
+  /**
+   * Resolves once the first pass has run. Files that land before then count as
+   * already there (left for `dz tidy`), so callers that drop files in should wait.
+   */
+  ready(): Promise<void> {
+    return this.firstPass;
+  }
+
   private startWatcher(): void {
+    this.firstPass = new Promise((resolveFirst) => (this.firstPassDone = resolveFirst));
     this.control = startWatching({
       ...this.options,
       inbox: this.options.folder,
@@ -158,6 +170,7 @@ export class Daemon {
   }
 
   private async onCycle(result: CycleResult): Promise<void> {
+    this.firstPassDone();
     this.dizzy = null;
     this.settling = result.settling;
     if (result.run?.moved) {

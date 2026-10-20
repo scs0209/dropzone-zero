@@ -58,6 +58,7 @@ before(async () => {
     if ((error as NodeJS.ErrnoException).code === "EPERM") listening = false;
     else throw error;
   }
+  if (listening) await daemon.ready();
   base = `http://127.0.0.1:${daemon.port}`;
   if (listening) {
     const info = JSON.parse(await readFile(infoPath, "utf8")) as { port: number; token: string };
@@ -135,6 +136,7 @@ describe("dz daemon moods", () => {
       },
     });
     await slow.start();
+    await slow.ready();
     try {
       await writeFile(join(folder, "receipt.pdf"), "coffee");
       await until(async () => slow.state().mood === "thinking");
