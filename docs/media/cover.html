@@ -2,8 +2,8 @@
 <!--
   The DEV cover image (1000x420). A field of documents runs across the whole
   frame: scattered and tilted on the left, settling into a grid sorted by kind
-  on the right. A scribble under the title straightens out the same way. One
-  tile in the sorted grid is Zee. Rebuild with: pnpm media:cover
+  on the right. A scribble under the title straightens out the same way, and
+  Zee stands where the mess turns into order, filing a page. Rebuild with: pnpm media:cover
 -->
 <html lang="en">
   <head>
@@ -13,13 +13,14 @@
       * { margin: 0; }
       html, body { width: 1000px; height: 420px; overflow: hidden; background: #15191c; }
       svg { display: block; }
+      #robot { position: absolute; left: 596px; top: 262px; width: 168px; height: 168px; }
       .title {
         font-family: "SF Pro Display", -apple-system, "Helvetica Neue", Arial, sans-serif;
         font-weight: 600; letter-spacing: -0.035em;
       }
     </style>
   </head>
-  <body>
+  <body class="eating">
     <svg id="cover" width="1000" height="420" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
       <rect width="1000" height="420" fill="#15191c" />
       <g id="tiles"></g>
@@ -46,13 +47,13 @@
       const tiles = document.getElementById("tiles");
       const W = 26, H = 34, dx = 40, dy = 48;
       const rows = [14, 62, 110, 286, 334, 382]; // the band in the middle is left for the title
-      let zeeDone = false;
 
-      for (const [r, y0] of rows.entries()) {
+      for (const y0 of rows) {
         for (let c = 0; c < 25; c++) {
           const x0 = 14 + c * dx;
           const order = smooth(260, 760, x0);
           if (random() > 0.55 + order * 0.45) continue; // the mess has gaps
+          if (y0 > 200 && x0 > 586 && x0 < 760) continue; // where Zee stands
           const chaos = 1 - order;
           const x = x0 + (random() - 0.5) * 70 * chaos;
           let y = y0 + (random() - 0.5) * 60 * chaos;
@@ -70,37 +71,19 @@
           rect.setAttribute("width", W);
           rect.setAttribute("height", H);
           rect.setAttribute("rx", 4);
-
-          const isZee = !zeeDone && r === 3 && c === 21;
-          if (isZee) {
-            zeeDone = true;
-            rect.setAttribute("fill", "#0c0f11");
-            rect.setAttribute("stroke", "#5dcaa5");
-            rect.setAttribute("stroke-width", 1.5);
-            g.appendChild(rect);
-            for (const ex of [9, 17]) {
-              const eye = document.createElementNS(svg, "circle");
-              eye.setAttribute("cx", ex);
-              eye.setAttribute("cy", 15);
-              eye.setAttribute("r", 2.6);
-              eye.setAttribute("fill", "#5dcaa5");
-              g.appendChild(eye);
-            }
-          } else {
-            rect.setAttribute("fill", colored ? kind : "#232a2f");
-            rect.setAttribute("opacity", colored ? 0.9 : 1);
-            g.appendChild(rect);
-            for (const [ly, lw] of [[10, 14], [16, 16], [22, 10]]) {
-              const line = document.createElementNS(svg, "rect");
-              line.setAttribute("x", 6);
-              line.setAttribute("y", ly);
-              line.setAttribute("width", lw);
-              line.setAttribute("height", 2);
-              line.setAttribute("rx", 1);
-              line.setAttribute("fill", colored ? "#15191c" : "#3a444b");
-              line.setAttribute("opacity", colored ? 0.35 : 1);
-              g.appendChild(line);
-            }
+          rect.setAttribute("fill", colored ? kind : "#232a2f");
+          rect.setAttribute("opacity", colored ? 0.9 : 1);
+          g.appendChild(rect);
+          for (const [ly, lw] of [[10, 14], [16, 16], [22, 10]]) {
+            const line = document.createElementNS(svg, "rect");
+            line.setAttribute("x", 6);
+            line.setAttribute("y", ly);
+            line.setAttribute("width", lw);
+            line.setAttribute("height", 2);
+            line.setAttribute("rx", 1);
+            line.setAttribute("fill", colored ? "#15191c" : "#3a444b");
+            line.setAttribute("opacity", colored ? 0.35 : 1);
+            g.appendChild(line);
           }
           tiles.appendChild(g);
         }
@@ -115,5 +98,7 @@
       }
       document.getElementById("line").setAttribute("d", "M" + points.join(" L"));
     </script>
+    <canvas id="robot"></canvas>
+    <script type="module" src="../../app/ui/robot.js"></script>
   </body>
 </html>
