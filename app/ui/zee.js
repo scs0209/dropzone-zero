@@ -36,6 +36,7 @@ async function call(method, path, body) {
 function setMood(mood) {
   zee.className = mood;
   document.body.className = mood;
+  window.zeeRobot?.setMood(mood);
   $("badge").textContent = mood === "paused" ? "II" : mood === "dizzy" ? "?" : "";
 }
 
@@ -127,9 +128,61 @@ async function poll() {
   }
 }
 
-zee.addEventListener("click", () => {
-  bubble.hidden = !bubble.hidden;
+// Click opens the bubble; press and move drags Zee anywhere on screen. The two are
+// told apart by distance, so a slightly shaky click still counts as a click.
+const tauriWindow = window.__TAURI__?.window.getCurrentWindow();
+let press = null;
+
+zee.addEventListener("mousedown", (event) => {
+  if (event.button === 0) press = { x: event.screenX, y: event.screenY, dragged: false };
 });
+
+window.addEventListener("mousemove", (event) => {
+  if (!press || press.dragged || !tauriWindow) return;
+  if (Math.hypot(event.screenX - press.x, event.screenY - press.y) > 4) {
+    press.dragged = true;
+    tauriWindow.startDragging();
+  }
+});
+
+zee.addEventListener("click", () => {
+  const dragged = press?.dragged;
+  press = null;
+  if (!dragged) bubble.hidden = !bubble.hidden;
+});
+
+// Remember where Zee was put, and come back there next time (if that spot is still on a screen).
+const POSITION_KEY = "zee-position";
+
+async function restorePosition() {
+  if (!tauriWindow) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(POSITION_KEY) ?? "null");
+    const monitor = await tauriWindow.currentMonitor();
+    if (!saved || !monitor) return;
+    const { position, size } = monitor;
+    const onScreen =
+      saved.x >= position.x && saved.y >= position.y && saved.x < position.x + size.width - 50 && saved.y < position.y + size.height - 50;
+    if (onScreen) await tauriWindow.setPosition(new window.__TAURI__.dpi.PhysicalPosition(saved.x, saved.y));
+  } catch {
+    // Storage or window APIs unavailable: stay where the app placed Zee.
+  }
+}
+
+let saveTimer;
+tauriWindow?.onMoved(({ payload }) => {
+  press = null;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(POSITION_KEY, JSON.stringify({ x: payload.x, y: payload.y }));
+    } catch {
+      // Not saved; Zee returns to the corner next time.
+    }
+  }, 300);
+});
+
+restorePosition();
 
 $("undo").addEventListener("click", async () => {
   if (!confirm("Put back everything the last run moved?")) return;

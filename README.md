@@ -139,17 +139,17 @@ While it runs, watch owns the saved plan, so use `dz tidy` for the backlog befor
 
 ## Zee, the desktop companion
 
-Not everyone wants a terminal open. Zee is a small character that sits in the corner of the screen, always on top, and shows what Dropzone Zero is doing:
+Not everyone wants a terminal open. Zee is a small 3D robot that sits in the corner of the screen, always on top, turns its head toward your pointer, and shows what Dropzone Zero is doing on its screen face and antenna light:
 
 | Zee | Means |
 |---|---|
-| Dozing, z z z | Watching; nothing to do |
-| Munching a page | Just filed a download |
-| Hand up, with a badge | Something needs your OK |
-| Dizzy eyes | Cannot work (usually the local model is not running yet) |
-| Grey | Paused |
+| Flat eyes, z z z | Watching; nothing to do |
+| Green light, a page flying into it | Just filed a download |
+| Waving, amber light, badge | Something needs your OK |
+| Orange eyes, wobbling | Cannot work (usually the local model is not running yet) |
+| Grey, screen off | Paused |
 
-Click Zee to open a speech bubble: each question gets **Move it** and **Leave it** buttons, recently filed files open in Finder with a click, and **Undo last** and **Pause** are one click away. Zee opens the bubble by itself when a new question arrives.
+Drag Zee anywhere on the screen; it remembers the spot. Click Zee to open a speech bubble: each question gets **Move it** and **Leave it** buttons, recently filed files open in Finder with a click, and **Undo last** and **Pause** are one click away. Zee opens the bubble by itself when a new question arrives.
 
 ```bash
 pnpm app:build                        # builds Zee.app (about 10 MB) with Tauri
@@ -157,7 +157,7 @@ pnpm dz autostart enable ~/Downloads   # daemon and Zee start now and at every l
 pnpm app                              # or run Zee in development mode
 ```
 
-Zee is a [Tauri](https://tauri.app) app: a Rust shell around the system WebView, so it is about 10 MB instead of shipping a browser. It never touches files. It talks to `dz daemon` over `127.0.0.1` with a random token that only your user can read (`~/.dropzone-zero/daemon.json`, mode 600), and the daemon refuses requests from any other web origin. Every click goes through the same guard and executor as the command line: **Move it** can only release a review item, and **Show in Finder** only opens files Dropzone Zero itself moved.
+Zee is a [Tauri](https://tauri.app) app: a Rust shell around the system WebView, so it is about 10 MB instead of shipping a browser. The robot is built from simple shapes in [three.js](https://threejs.org) (pinned, copied into the app at build time, no CDN) and renders at 30 frames per second when active and 12 when resting, so an always-on companion stays cheap. It never touches files. It talks to `dz daemon` over `127.0.0.1` with a random token that only your user can read (`~/.dropzone-zero/daemon.json`, mode 600), and the daemon refuses requests from any other web origin. Every click goes through the same guard and executor as the command line: **Move it** can only release a review item, and **Show in Finder** only opens files Dropzone Zero itself moved.
 
 ## How a run stays safe
 

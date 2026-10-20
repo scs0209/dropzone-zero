@@ -18,12 +18,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json",
     "test": "node --import tsx --test test/*.test.ts",
     "seed:history": "node --import tsx scripts/seed-history.ts",
-    "app": "tauri dev --config app/src-tauri/tauri.conf.json",
-    "app:build": "tauri build --config app/src-tauri/tauri.conf.json"
+    "app": "node scripts/vendor-three.mjs && tauri dev --config app/src-tauri/tauri.conf.json",
+    "app:build": "node scripts/vendor-three.mjs && tauri build --config app/src-tauri/tauri.conf.json",
+    "app:vendor": "node scripts/vendor-three.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.1",
     "@types/node": "^22.10.0",
+    "three": "0.186.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
