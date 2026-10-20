@@ -17,9 +17,12 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json",
     "test": "node --import tsx --test test/*.test.ts",
-    "seed:history": "node --import tsx scripts/seed-history.ts"
+    "seed:history": "node --import tsx scripts/seed-history.ts",
+    "app": "tauri dev --config app/src-tauri/tauri.conf.json",
+    "app:build": "tauri build --config app/src-tauri/tauri.conf.json"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "2.12.1",
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"

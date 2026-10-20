@@ -42,7 +42,8 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz undo [folder] --file <name>` | Moves single files from the last run back (by old name, new name, or new path) and teaches the review gate that this move was wrong |
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
 | `dz watch [folder] [--auto]` | Keeps planning as files arrive. With `--auto`, allowed moves run on their own; review and blocked items still wait |
-| `dz autostart enable [folder]` | Starts `dz watch --auto` at every login (macOS LaunchAgent); `disable` removes it, `status` shows whether it is running |
+| `dz daemon [folder]` | The watcher plus a local API (127.0.0.1, token-protected) for the Zee desktop app |
+| `dz autostart enable [folder]` | Starts the daemon, and Zee if built, at every login (macOS LaunchAgents); `disable` removes them, `status` shows whether it is running |
 | `dz recent [folder] [--reveal]` | Lists what moved where, newest first; `--reveal` opens the latest file (or `--file <name>`) in Finder |
 | `dz status [folder]` | Shows where every file stands: planned, needs review, approved, blocked, executing, verified, failed, or restored |
 | `dz approve [folder] --file <name>` | Releases an item the guard holds for review, for exactly the move shown (`--all` releases every review item) |
@@ -135,6 +136,28 @@ pnpm dz autostart disable              # stops it and removes it from login
 This writes a standard per-user LaunchAgent (`~/Library/LaunchAgents/dev.dropzone-zero.watch.plist`), loads it with `launchctl`, and logs to `~/Library/Logs/dropzone-zero/watch.log`. If Ollama is not up yet at login, the watcher waits for it. In the background there is no terminal to ask in, so decisions arrive as notifications and are answered with `dz status`, `dz approve`, or `dz run`. macOS may ask whether node may access your Downloads folder; the watcher needs that permission to read it.
 
 While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
+
+## Zee, the desktop companion
+
+Not everyone wants a terminal open. Zee is a small character that sits in the corner of the screen, always on top, and shows what Dropzone Zero is doing:
+
+| Zee | Means |
+|---|---|
+| Dozing, z z z | Watching; nothing to do |
+| Munching a page | Just filed a download |
+| Hand up, with a badge | Something needs your OK |
+| Dizzy eyes | Cannot work (usually the local model is not running yet) |
+| Grey | Paused |
+
+Click Zee to open a speech bubble: each question gets **Move it** and **Leave it** buttons, recently filed files open in Finder with a click, and **Undo last** and **Pause** are one click away. Zee opens the bubble by itself when a new question arrives.
+
+```bash
+pnpm app:build                        # builds Zee.app (about 10 MB) with Tauri
+pnpm dz autostart enable ~/Downloads   # daemon and Zee start now and at every login
+pnpm app                              # or run Zee in development mode
+```
+
+Zee is a [Tauri](https://tauri.app) app: a Rust shell around the system WebView, so it is about 10 MB instead of shipping a browser. It never touches files. It talks to `dz daemon` over `127.0.0.1` with a random token that only your user can read (`~/.dropzone-zero/daemon.json`, mode 600), and the daemon refuses requests from any other web origin. Every click goes through the same guard and executor as the command line: **Move it** can only release a review item, and **Show in Finder** only opens files Dropzone Zero itself moved.
 
 ## How a run stays safe
 

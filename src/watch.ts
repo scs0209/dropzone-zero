@@ -176,7 +176,11 @@ export interface WatchControl {
  * the next pass, so every change to the folder still goes through one cycle at a time.
  */
 export function startWatching(
-  options: WatchOptions & { debounceMs?: number; onCycle: (result: CycleResult) => void; onError: (error: unknown) => void },
+  options: WatchOptions & {
+    debounceMs?: number;
+    onCycle: (result: CycleResult) => void;
+    onError: (error: unknown) => void;
+  },
 ): WatchControl {
   const state = newWatchState();
   const { debounceMs = DEFAULT_DEBOUNCE_MS, settleMs = DEFAULT_SETTLE_MS } = options;

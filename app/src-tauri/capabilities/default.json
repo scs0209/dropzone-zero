@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Zee's window: core features and dragging the character around.",
+  "windows": ["zee"],
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
+}

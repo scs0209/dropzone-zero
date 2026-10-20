@@ -6,19 +6,24 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-// `dz autostart`: starts `dz watch --auto` at login through a macOS LaunchAgent,
-// the standard per-user mechanism (a plist in ~/Library/LaunchAgents, loaded by
-// launchctl). Disabling unloads it and deletes the plist; nothing else changes.
+// `dz autostart`: starts `dz daemon` (the watcher plus the local API) at login
+// through a macOS LaunchAgent, the standard per-user mechanism (a plist in
+// ~/Library/LaunchAgents, loaded by launchctl), and, if Zee.app has been built,
+// opens Zee too. Disabling unloads both and deletes the plists; nothing else changes.
 
 const run = promisify(execFile);
 
 export const LABEL = "dev.dropzone-zero.watch";
+export const ZEE_LABEL = "dev.dropzone-zero.zee";
 
 export interface AutostartPaths {
   plist: string;
+  zeePlist: string;
   log: string;
   repo: string;
   node: string;
+  /** The built desktop app, if `pnpm app:build` has run. */
+  zeeApp: string;
 }
 
 export function autostartPaths(): AutostartPaths {
@@ -27,11 +32,14 @@ export function autostartPaths(): AutostartPaths {
     process.execPath.startsWith("/opt/homebrew/Cellar/node/") && existsSync("/opt/homebrew/bin/node")
       ? "/opt/homebrew/bin/node"
       : process.execPath;
+  const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   return {
     plist: join(homedir(), "Library", "LaunchAgents", `${LABEL}.plist`),
+    zeePlist: join(homedir(), "Library", "LaunchAgents", `${ZEE_LABEL}.plist`),
     log: join(homedir(), "Library", "Logs", "dropzone-zero", "watch.log"),
-    repo: resolve(dirname(fileURLToPath(import.meta.url)), ".."),
+    repo,
     node,
+    zeeApp: join(repo, "app", "src-tauri", "target", "release", "bundle", "macos", "Zee.app"),
   };
 }
 
@@ -41,7 +49,7 @@ function xml(text: string): string {
 
 /** The LaunchAgent definition. Pure, so it can be tested without touching the system. */
 export function buildPlist(folder: string, paths: AutostartPaths): string {
-  const args = [paths.node, "--import", "tsx", join(paths.repo, "src", "cli.ts"), "watch", folder, "--auto"];
+  const args = [paths.node, "--import", "tsx", join(paths.repo, "src", "cli.ts"), "daemon", folder];
   // launchd starts with a bare PATH; uv (review gate) and osascript (notifications) must be findable.
   const path = [dirname(paths.node), join(homedir(), ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].join(":");
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -78,30 +86,72 @@ ${args.map((arg) => `    <string>${xml(arg)}</string>`).join("\n")}
 `;
 }
 
+/** Opens Zee once at login. Not kept alive: closing Zee is the person's choice; the daemon keeps working. */
+export function buildZeePlist(paths: AutostartPaths): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${ZEE_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/open</string>
+    <string>-a</string>
+    <string>${xml(paths.zeeApp)}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
+`;
+}
+
 function assertMac(): void {
   if (process.platform !== "darwin") throw new Error("dz autostart uses macOS LaunchAgents and works on macOS only.");
 }
 
 const domain = () => `gui/${process.getuid?.() ?? 0}`;
 
-export async function enableAutostart(folder: string): Promise<AutostartPaths> {
+/**
+ * Unloads a LaunchAgent and waits until launchd has let go of it; bootstrapping
+ * again too early fails with "Bootstrap failed: 5: Input/output error".
+ */
+async function unload(label: string): Promise<void> {
+  await run("launchctl", ["bootout", `${domain()}/${label}`]).catch(() => {});
+  for (let i = 0; i < 50; i++) {
+    const loaded = await run("launchctl", ["print", `${domain()}/${label}`]).then(() => true, () => false);
+    if (!loaded) return;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+}
+
+export async function enableAutostart(folder: string): Promise<AutostartPaths & { zee: boolean }> {
   assertMac();
   const paths = autostartPaths();
   await mkdir(dirname(paths.plist), { recursive: true });
   await mkdir(dirname(paths.log), { recursive: true });
   await writeFile(paths.plist, buildPlist(folder, paths));
   // Replace a previous registration, if any, so the new settings take effect now.
-  await run("launchctl", ["bootout", `${domain()}/${LABEL}`]).catch(() => {});
+  await unload(LABEL);
   await run("launchctl", ["bootstrap", domain(), paths.plist]);
-  return paths;
+  const zee = existsSync(paths.zeeApp);
+  if (zee) {
+    await writeFile(paths.zeePlist, buildZeePlist(paths));
+    await unload(ZEE_LABEL);
+    await run("launchctl", ["bootstrap", domain(), paths.zeePlist]);
+  }
+  return { ...paths, zee };
 }
 
 export async function disableAutostart(): Promise<boolean> {
   assertMac();
   const paths = autostartPaths();
   const existed = existsSync(paths.plist);
-  await run("launchctl", ["bootout", `${domain()}/${LABEL}`]).catch(() => {});
+  await unload(LABEL);
+  await unload(ZEE_LABEL);
   await rm(paths.plist, { force: true });
+  await rm(paths.zeePlist, { force: true });
   return existed;
 }
 

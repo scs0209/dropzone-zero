@@ -54,8 +54,9 @@ Usage:
   dz recent [folder] [--reveal] [--file <name>] [--limit N]
                                  Show what moved where; --reveal opens it in Finder
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
+  dz daemon [folder]             Run the watcher with a local API for the Zee desktop app
   dz autostart enable [folder] | disable | status
-                                 Start dz watch --auto at login (macOS LaunchAgent)
+                                 Start the daemon (and Zee, if built) at login (macOS LaunchAgent)
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
                                  Export vendor, date, and total of receipts and invoices to CSV
@@ -473,10 +474,14 @@ async function autostart(action: string | undefined, folderArg: string | undefin
   if (action === "enable") {
     const folder = resolve(expandHome(folderArg ?? process.env.DZ_INBOX ?? "~/Downloads"));
     const paths = await enableAutostart(folder);
-    console.log(`dz watch --auto now starts at login for ${folder}, and is running now.`);
+    console.log(`The Dropzone Zero daemon now starts at login for ${folder}, and is running now.`);
     console.log(`  LaunchAgent: ${paths.plist}`);
     console.log(`  Log:         ${paths.log}`);
-    console.log("Decisions arrive as notifications; answer them with `dz status`, `dz approve`, or `dz run`.");
+    console.log(
+      paths.zee
+        ? "Zee starts at login too; click Zee to answer questions and see what moved."
+        : "Build Zee with `pnpm app:build` and run this again to start Zee at login too; until then, use notifications and `dz status`.",
+    );
     console.log("If macOS asks whether node may access your Downloads folder, allow it, or the watcher cannot read it.");
     return;
   }
@@ -523,6 +528,30 @@ async function recent(folder: string, json: boolean, reveal: boolean, file: stri
   await new Promise<void>((resolveOpen, rejectOpen) =>
     execFile("open", ["-R", join(folder, target.to)], (error) => (error ? rejectOpen(error) : resolveOpen())),
   );
+}
+
+/** The watcher plus the local API the Zee desktop app talks to. */
+async function daemon(folder: string): Promise<void> {
+  const client = new OllamaClient();
+  const { Daemon } = await import("./daemon.js");
+  const instance = new Daemon({
+    folder,
+    model: client.model,
+    classify: async (file) => classifyFile(client, file, await extractContent(file)),
+    waitForModel: () => waitForOllama(client),
+    onEvent: (result) => {
+      printCycle(result);
+      if (result.run?.moves.length) notify("Dropzone Zero: filed", describeMoves(result.run.moves));
+      if (result.needsDecision) notify("Dropzone Zero", "Zee needs your OK. Click Zee to answer.");
+    },
+  });
+  await instance.start();
+  console.log(`Daemon watching ${folder}; the Zee app connects on 127.0.0.1. Press Ctrl+C to stop.`);
+  await new Promise<void>((resolveStop) => {
+    const stop = () => void instance.stop().then(resolveStop);
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
 }
 
 async function approve(folder: string, files: string[], all: boolean): Promise<void> {
@@ -661,6 +690,7 @@ async function main(): Promise<void> {
     return recent(folder, json, values.reveal ?? false, values.file?.[0], Number(values.limit ?? 20));
   }
   if (command === "tidy") return tidy(folder, values.yes ?? false);
+  if (command === "daemon") return daemon(folder);
   if (command === "watch") return watchFolder(folder, values.auto ?? false, values["include-existing"] ?? false);
   if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
   if (command === "receipts") return receipts(folder, values.out);

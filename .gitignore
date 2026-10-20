@@ -19,3 +19,7 @@ demo/
 # Python environment for the local TabPFN review gate (ml/)
 ml/.venv/
 __pycache__/
+
+# Tauri build output for the Zee app
+app/src-tauri/target/
+app/src-tauri/gen/

@@ -1,0 +1,14 @@
+[package]
+name = "zee"
+version = "0.1.0"
+description = "Zee, the Dropzone Zero desktop companion"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "=2.7.1", features = [] }
+
+[dependencies]
+# macos-private-api: required for a transparent window on macOS.
+tauri = { version = "=2.12.1", features = ["macos-private-api"] }
