@@ -3,10 +3,19 @@
 // in the daemon, behind the same guardrails as the command line.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::Manager;
+use std::sync::Mutex;
+
+use tauri::image::Image;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Manager, Wry};
 
 const WIDTH: f64 = 300.0;
 const HEIGHT: f64 = 380.0;
+const TRAY_ID: &str = "zee-tray";
+
+/// The menu item whose label flips between "Hide Zee" and "Show Zee".
+struct ToggleItem(Mutex<MenuItem<Wry>>);
 
 /// The daemon's port and token, written by `dz daemon` to a file only this user can read.
 #[tauri::command]
@@ -18,13 +27,71 @@ fn daemon_info() -> Result<String, String> {
     })
 }
 
+/// Shows or hides Zee and keeps the menu bar item's label in step.
+#[tauri::command]
+fn set_zee_visible(app: AppHandle, visible: bool) {
+    if let Some(window) = app.get_webview_window("zee") {
+        let _ = if visible { window.show() } else { window.hide() };
+    }
+    if let Some(item) = app.try_state::<ToggleItem>() {
+        if let Ok(item) = item.0.lock() {
+            let _ = item.set_text(if visible { "Hide Zee" } else { "Show Zee" });
+        }
+    }
+}
+
+/// Puts the number of open questions next to the menu bar icon, so a hidden Zee can still ask.
+#[tauri::command]
+fn set_attention(app: AppHandle, count: u32) {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_title(if count > 0 { Some(count.to_string()) } else { None });
+    }
+}
+
+fn toggle(app: &AppHandle) {
+    let visible = app
+        .get_webview_window("zee")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    set_zee_visible(app.clone(), !visible);
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![daemon_info])
+        .invoke_handler(tauri::generate_handler![daemon_info, set_zee_visible, set_attention])
         .setup(|app| {
-            // A companion, not an app window: no Dock icon.
+            // A companion, not an app window: no Dock icon. The menu bar icon brings Zee back.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            let toggle_item = MenuItem::with_id(app, "toggle", "Hide Zee", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit Zee", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&toggle_item, &quit_item])?;
+            app.manage(ToggleItem(Mutex::new(toggle_item)));
+
+            TrayIconBuilder::with_id(TRAY_ID)
+                .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
+                .icon_as_template(true)
+                .tooltip("Zee (Dropzone Zero)")
+                .menu(&menu)
+                // Left click toggles Zee; the menu opens on right click.
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "toggle" => toggle(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        toggle(tray.app_handle());
+                    }
+                })
+                .build(app)?;
 
             // Sit in the bottom-right corner, above the Dock.
             if let Some(window) = app.get_webview_window("zee") {

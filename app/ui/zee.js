@@ -40,7 +40,16 @@ function setMood(mood) {
   $("badge").textContent = mood === "paused" ? "II" : mood === "dizzy" ? "?" : "";
 }
 
+// The menu bar icon shows how many questions are open, so a hidden Zee can still ask.
+let attention = -1;
+function setAttention(count) {
+  if (count === attention) return;
+  attention = count;
+  window.__TAURI__?.core.invoke("set_attention", { count }).catch(() => {});
+}
+
 function render(state) {
+  setAttention(state.pending.length);
   setMood(state.mood);
   $("badge").textContent = state.mood === "asking" ? String(state.pending.length) : $("badge").textContent;
   $("message").textContent = state.message;
@@ -299,6 +308,11 @@ async function restoreWindow() {
 }
 
 restoreWindow();
+
+$("hide").addEventListener("click", () => {
+  setBubbleOpen(false);
+  window.__TAURI__?.core.invoke("set_zee_visible", { visible: false }).catch(showError);
+});
 
 $("undo").addEventListener("click", async () => {
   if (!confirm("Put back everything the last run moved?")) return;

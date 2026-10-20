@@ -150,7 +150,7 @@ Not everyone wants a terminal open. Zee is a small 3D robot that sits in the cor
 | Orange eyes, wobbling | Cannot work (usually the local model is not running yet) |
 | Grey, screen off | Paused |
 
-Drag Zee anywhere on the screen; resize the speech bubble from its top-left corner. Zee keeps its size, the window shrinks to just Zee when the bubble is closed so it never covers other windows, and both the spot and the bubble size are remembered. Click Zee to open a speech bubble: each question gets **Move it** and **Leave it** buttons, recently filed files open in Finder with a click, and **Undo last** and **Pause** are one click away. Zee opens the bubble by itself when a new question arrives.
+Drag Zee anywhere on the screen; resize the speech bubble from its top-left corner. Zee keeps its size, the window shrinks to just Zee when the bubble is closed so it never covers other windows, and both the spot and the bubble size are remembered. A small robot icon in the menu bar shows and hides Zee (left click), and its menu has Show/Hide and Quit; while Zee is hidden, the number of open questions appears next to that icon, and the daemon keeps working. Click Zee to open a speech bubble: each question gets **Move it** and **Leave it** buttons, recently filed files open in Finder with a click, and **Undo last**, **Pause**, and **Hide** are one click away. Zee opens the bubble by itself when a new question arrives.
 
 ```bash
 pnpm app:build                        # builds Zee.app (about 10 MB) with Tauri
