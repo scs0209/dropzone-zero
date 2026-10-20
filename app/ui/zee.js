@@ -201,6 +201,8 @@ function save(key, value) {
 }
 
 let bubbleSize = load(BUBBLE_KEY) ?? { w: 276, h: 222 };
+// Set while the bubble is being dragged to a new size (see the resize handle below).
+let resizing = null;
 function applyBubbleSize() {
   document.documentElement.style.setProperty("--bubble-w", `${bubbleSize.w}px`);
   document.documentElement.style.setProperty("--bubble-h", `${bubbleSize.h}px`);
@@ -208,7 +210,12 @@ function applyBubbleSize() {
 applyBubbleSize();
 
 function windowSize() {
-  return bubble.hidden ? { w: ZEE_BOX, h: ZEE_BOX } : { w: Math.max(bubbleSize.w + 24, ZEE_BOX), h: bubbleSize.h + BUBBLE_ABOVE_ZEE + 12 };
+  if (bubble.hidden) return { w: ZEE_BOX, h: ZEE_BOX };
+  // While the bubble is being resized the window stays at the largest size the bubble
+  // can reach, and only the bubble changes inside it: resizing the window on every
+  // pointer move made the webview redraw at the new size a frame late, so Zee shook.
+  const size = resizing ? BUBBLE_MAX : bubbleSize;
+  return { w: Math.max(size.w + 24, ZEE_BOX), h: size.h + BUBBLE_ABOVE_ZEE + 12 };
 }
 
 /** Where Zee's bottom-right corner is, in logical screen pixels. */
@@ -259,12 +266,12 @@ function setBubbleOpen(open) {
 // Resize the bubble from its top-left corner. Pointer capture keeps the drag going
 // even when the pointer runs ahead of the window edge.
 const handle = $("bubble-resize");
-let resizing = null;
 handle.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) return;
   event.preventDefault();
   handle.setPointerCapture(event.pointerId);
   resizing = { x: event.screenX, y: event.screenY, w: bubbleSize.w, h: bubbleSize.h };
+  fitWindow(); // grow once, to the largest bubble
 });
 handle.addEventListener("pointermove", (event) => {
   if (!resizing) return;
@@ -274,12 +281,12 @@ handle.addEventListener("pointermove", (event) => {
     h: clamp(resizing.h + resizing.y - event.screenY, BUBBLE_MIN.h, BUBBLE_MAX.h),
   };
   applyBubbleSize();
-  fitWindow();
 });
 const endResize = () => {
   if (!resizing) return;
   resizing = null;
   save(BUBBLE_KEY, bubbleSize);
+  fitWindow(); // shrink once, to the bubble as left
 };
 handle.addEventListener("pointerup", endResize);
 handle.addEventListener("pointercancel", endResize);

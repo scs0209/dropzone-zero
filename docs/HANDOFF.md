@@ -29,7 +29,7 @@ Backboard, Auth0, and Render were dropped.
 
 ## Open
 
-- **Zee resize shake fix (e1692ee):** compiles, but not yet tried in a rebuilt Zee.app.
+- **Zee resize shake fix:** the window no longer resizes during a bubble drag; check it by eye after `pnpm app:build`.
 - **Post TODOs:** a Sentry trace screenshot (needs a Sentry login) and the agent
   session link (DevRelay or Entire; choose which sessions may be public).
 - **Numbers to reconcile:** the README says 75% of a real folder went to "other"
