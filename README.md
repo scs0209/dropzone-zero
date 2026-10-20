@@ -105,7 +105,16 @@ That run is a Chrome-style download (a `.crdownload` file renamed when finished)
 
 With `--auto`, only files that arrive after watching starts are moved. Files that were already in the folder are not even sent to the model, so a cluttered Downloads folder never makes a new download wait; sort the backlog with `dz tidy` whenever you like, or pass `--include-existing` to let watch handle it too.
 
-Watch mode does not loosen anything. Without `--auto` it only plans. With it, only `ALLOW` items move; `REVIEW` items wait for `dz approve` (approvals carry over between passes as long as the move is unchanged), `BLOCK` items never move, and if the allowed batch is larger than the bulk limit, nothing moves until you confirm with `dz run`. While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
+Watch mode does not loosen anything. Without `--auto` it only plans. With it, only `ALLOW` items move on their own; `BLOCK` items never move; and anything that needs a person, a `REVIEW` item or a batch of new files larger than the bulk limit, is asked about right in the watch terminal, once:
+
+```text
+13:01:55  1 planned (1 new to the model): 0 allowed, 1 review, 0 blocked
+13:01:55  not running: 1 waiting for review
+  Move SlothPlayer-2.0.pkg -> Installers/slothplayer-2-0-installer.pkg? (Program or installer) [y/N] y
+13:02:00  moved 1 file (run 20261020T040200483Z); `dz undo` reverses it
+```
+
+The watcher keeps handling new files while a question is open. On macOS a desktop notification says when a download was filed or when a decision is waiting, so you do not have to keep an eye on the terminal (`DZ_NOTIFY=off` silences them; they are shown locally and sent nowhere). Without a terminal to ask in, `dz approve` and `dz run` from another shell do the same job. While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
 
 ## How a run stays safe
 

@@ -10,8 +10,9 @@ import { scanFolder, type ScannedFile } from "./scan.js";
 // the guard allows for files that arrive while it is watching. Files that were
 // already in the folder are planned but left alone (`dz tidy` sorts them), so a
 // cluttered folder never holds up a new download. The guard's rules do not
-// loosen in watch mode: REVIEW items wait for `dz approve`, BLOCK items never
-// run, and a batch larger than the bulk limit waits for an explicit `dz run`.
+// loosen in watch mode: REVIEW items and batches larger than the bulk limit wait
+// for a person (asked right in the watch terminal, or `dz approve` / `dz run`),
+// and BLOCK items never run.
 
 /** A file modified more recently than this is probably still being written. */
 export const DEFAULT_SETTLE_MS = 5_000;
@@ -44,6 +45,12 @@ export interface CycleResult {
   /** Why an --auto cycle did not run, if it did not. */
   held?: string;
   run?: RunResult;
+  /** Things only a person can decide, each offered once. */
+  needsDecision?: {
+    reviews: PlanItem[];
+    /** A bulk batch of new files, identified by the fingerprints of its moves. */
+    batch?: { key: string; count: number };
+  };
 }
 
 export interface WatchState {
@@ -53,10 +60,22 @@ export interface WatchState {
   signature: string;
   /** Files (name and hash) present when watching started; null until the first cycle. */
   baseline: Set<string> | null;
+  /** Fingerprints of review items a person approved while watching. */
+  approved: Set<string>;
+  /** Keys of bulk batches a person approved while watching. */
+  approvedBatches: Set<string>;
+  /** Review items and batches already offered for a decision, so nobody is asked twice. */
+  offered: Set<string>;
+  /** Set after a decision, so the next pass runs even if nothing on disk changed. */
+  dirty: boolean;
 }
 
 export function newWatchState(): WatchState {
-  return { cache: new Map(), signature: "", baseline: null };
+  return { cache: new Map(), signature: "", baseline: null, approved: new Set(), approvedBatches: new Set(), offered: new Set(), dirty: false };
+}
+
+function batchKey(items: PlanItem[]): string {
+  return items.map(fingerprint).sort().join(",");
 }
 
 /** Approvals from the previous plan stay valid if the move they approved is still exactly the same. */
@@ -79,8 +98,9 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
   // Which files have settled is part of the signature: a file that finished writing is news.
   const signature = settled.map((f) => `${f.name}\n${f.size}\n${f.modifiedAt.getTime()}`).join("\n") + `\n#${scanned.length}`;
   const empty = { planned: 0, newlyClassified: 0, settling: 0, allowed: 0, review: 0, blocked: 0, existing: 0 };
-  if (signature === state.signature) return { unchanged: true, ...empty };
+  if (signature === state.signature && !state.dirty) return { unchanged: true, ...empty };
   state.signature = signature;
+  state.dirty = false;
 
   // In --auto mode the files that were already here are left alone, so they are not
   // even sent to the model: a new download never waits behind a cluttered folder.
@@ -101,6 +121,11 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
   });
   await applyReviewGate(inbox, plan, options.predictor);
   await carryOverApprovals(inbox, plan);
+  const at = new Date().toISOString();
+  for (const item of plan) {
+    const print = fingerprint(item);
+    if (item.verdict === "review" && state.approved.has(print)) item.approval = { at, fingerprint: print };
+  }
   await savePlan(inbox, options.model, plan);
 
   const result: CycleResult = {
@@ -117,21 +142,42 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
   if (!options.auto) return result;
 
   const runnable = movableItems(plan);
+  // Review items nobody has been asked about yet; each is offered once.
+  const reviews = plan.filter((item) => item.verdict === "review" && !item.approval && !state.offered.has(fingerprint(item)));
+  for (const item of reviews) state.offered.add(fingerprint(item));
+  const decide = (batch?: { key: string; count: number }) =>
+    reviews.length || batch ? { needsDecision: { reviews, ...(batch ? { batch } : {}) } } : {};
+
   if (runnable.length === 0) {
-    return { ...result, held: result.review ? `${result.review} waiting for review (\`dz approve\`)` : "nothing new to move" };
+    const waiting = plan.filter((item) => item.verdict === "review" && !item.approval).length;
+    return { ...result, ...decide(), held: waiting ? `${waiting} waiting for review` : "nothing new to move" };
   }
-  if (batchNeedsApproval(runnable)) return { ...result, held: `bulk change (${runnable.length} files); confirm with \`dz run\`` };
+  const key = batchKey(runnable);
+  if (batchNeedsApproval(runnable) && !state.approvedBatches.has(key)) {
+    const offer = state.offered.has(key) ? undefined : { key, count: runnable.length };
+    state.offered.add(key);
+    return { ...result, ...decide(offer), held: `bulk change (${runnable.length} new files) waiting for your OK` };
+  }
   // The plan was just written, so this runs exactly what was saved.
-  return { ...result, run: await executePlan(inbox, runnable) };
+  return { ...result, ...decide(), run: await executePlan(inbox, runnable) };
+}
+
+export interface WatchControl {
+  stop(): void;
+  /** Approves one review item (by fingerprint) and runs a pass to carry it out. */
+  approveItem(fingerprint: string): void;
+  /** Approves a bulk batch (by key) and runs a pass to carry it out. */
+  approveBatch(key: string): void;
 }
 
 /**
  * Watches the folder and runs a cycle after each burst of changes, plus one at
- * start. Returns a function that stops watching.
+ * start. Decisions come back through the returned control, and are applied by
+ * the next pass, so every change to the folder still goes through one cycle at a time.
  */
 export function startWatching(
   options: WatchOptions & { debounceMs?: number; onCycle: (result: CycleResult) => void; onError: (error: unknown) => void },
-): () => void {
+): WatchControl {
   const state = newWatchState();
   const { debounceMs = DEFAULT_DEBOUNCE_MS, settleMs = DEFAULT_SETTLE_MS } = options;
   let timer: NodeJS.Timeout | undefined;
@@ -170,8 +216,20 @@ export function startWatching(
     schedule(debounceMs);
   });
   void cycle();
-  return () => {
-    clearTimeout(timer);
-    watcher.close();
+  return {
+    stop() {
+      clearTimeout(timer);
+      watcher.close();
+    },
+    approveItem(print) {
+      state.approved.add(print);
+      state.dirty = true;
+      schedule(0);
+    },
+    approveBatch(key) {
+      state.approvedBatches.add(key);
+      state.dirty = true;
+      schedule(0);
+    },
   };
 }

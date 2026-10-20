@@ -19,7 +19,8 @@ import {
   type UndoResult,
 } from "./execute.js";
 import { contentKindOf, extractContent } from "./extract.js";
-import { batchNeedsApproval, DEFAULT_BULK_LIMIT, isRunnable } from "./guard.js";
+import { batchNeedsApproval, DEFAULT_BULK_LIMIT, fingerprint, isRunnable } from "./guard.js";
+import { notify } from "./notify.js";
 import { newRunId } from "./journal.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
@@ -46,7 +47,8 @@ Usage:
   dz approve [folder] --file <name> | --all
                                  Release items the guard holds for review
   dz watch [folder] [--auto] [--include-existing]
-                                 Keep planning as files arrive; --auto moves new files the guard allows
+                                 Keep planning as files arrive; --auto moves new files the guard
+                                 allows and asks you, right there, about the rest
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
@@ -64,6 +66,7 @@ Environment:
   DZ_MODEL      Ollama model (default gemma4:e4b)
   DZ_REVIEW_GATE  Set to "off" to skip the local TabPFN review gate
   DZ_BULK_LIMIT   Allowed moves above this count as a bulk change (default 20)
+  DZ_NOTIFY       Set to "off" to silence dz watch desktop notifications (macOS)
   TEMPORAL_ADDRESS  Temporal server for --temporal (default 127.0.0.1:7233)
   SENTRY_DSN    Optional; sends only aggregate counts and timings
 `;
@@ -356,7 +359,9 @@ async function status(folder: string, json: boolean): Promise<void> {
 
 function printCycle(result: CycleResult): void {
   const time = new Date().toTimeString().slice(0, 8);
-  const existing = result.existing ? `; ${result.existing} files that were already here are left alone (\`dz tidy\` sorts them)` : "";
+  const existing = result.existing
+    ? `; ${result.existing} ${result.existing === 1 ? "file that was" : "files that were"} already here ${result.existing === 1 ? "is" : "are"} left alone (\`dz tidy\` sorts them)`
+    : "";
   if (result.planned === 0) {
     console.log(`${time}  ${result.settling ? `waiting for ${result.settling} ${result.settling === 1 ? "file" : "files"} to finish writing` : "nothing new"}${existing}`);
     return;
@@ -385,7 +390,30 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
         : "Planning only; pass --auto to move new files."
     } Press Ctrl+C to stop.`,
   );
-  const stop = startWatching({
+  // Decisions are asked right here when there is a terminal to ask in, one at a
+  // time, while the watcher keeps handling new files in the background.
+  const rl = auto && process.stdin.isTTY ? createInterface({ input: process.stdin, output: process.stdout }) : null;
+  rl?.on("SIGINT", () => process.emit("SIGINT"));
+  let questions = Promise.resolve();
+  const ask = (question: string): Promise<boolean> =>
+    rl ? rl.question(`${question} [y/N] `).then((answer) => /^y(es)?$/i.test(answer.trim())) : Promise.resolve(false);
+
+  const onDecision = (decision: NonNullable<CycleResult["needsDecision"]>) => {
+    const count = decision.reviews.length + (decision.batch ? 1 : 0);
+    notify("Dropzone Zero", `${count === 1 ? "A new download needs" : `${count} decisions need`} your OK in the dz watch terminal.`);
+    if (!rl) {
+      console.log("  Approve with `dz approve --file <name>` or `dz run` in another terminal.");
+      return;
+    }
+    questions = questions.then(async () => {
+      for (const item of decision.reviews) {
+        if (await ask(`  Move ${item.name} -> ${item.target}? (${item.checks.join("; ")})`)) control.approveItem(fingerprint(item));
+      }
+      if (decision.batch && (await ask(`  Move all ${decision.batch.count} new files now?`))) control.approveBatch(decision.batch.key);
+    });
+  };
+
+  const control = startWatching({
     inbox: folder,
     model: client.model,
     auto,
@@ -394,6 +422,10 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
     onCycle: (result) => {
       recordCounts("dz.watch", { planned: result.planned, moved: result.run?.moved ?? 0 });
       printCycle(result);
+      if (result.run?.moved) {
+        notify("Dropzone Zero", `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}. \`dz undo\` puts ${result.run.moved === 1 ? "it" : "them"} back.`);
+      }
+      if (result.needsDecision) onDecision(result.needsDecision);
     },
     onError: (error) => {
       captureError(error);
@@ -402,7 +434,8 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
   });
   await new Promise<void>((resolveStop) => {
     process.once("SIGINT", () => {
-      stop();
+      control.stop();
+      rl?.close();
       console.log("\nStopped watching.");
       resolveStop();
     });

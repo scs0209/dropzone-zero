@@ -7,6 +7,8 @@ import { beforeEach, describe, it } from "node:test";
 import type { ClassifyResult } from "../src/classify.js";
 import { approveItems, loadPlan } from "../src/execute.js";
 import type { ScannedFile } from "../src/scan.js";
+import { fingerprint } from "../src/guard.js";
+import { appleScriptString } from "../src/notify.js";
 import { newWatchState, watchCycle, type WatchOptions } from "../src/watch.js";
 
 let inbox: string;
@@ -149,4 +151,48 @@ describe("watchCycle", () => {
     const result = await watchCycle(newWatchState(), options({ auto: true, includeExisting: true }));
     assert.equal(result.run?.moved, 1);
   });
+
+  it("offers a review item for a decision once, and moves it after approval", async () => {
+    const state = newWatchState();
+    await watchCycle(state, options({ auto: true }));
+    await arrive("setup.pkg");
+    const asked = await watchCycle(state, options({ auto: true }));
+    assert.deepEqual(asked.needsDecision?.reviews.map((i) => i.name), ["setup.pkg"]);
+    assert.ok(existsSync(join(inbox, "setup.pkg")));
+
+    // Asked once: a later pass does not ask again.
+    state.dirty = true;
+    assert.equal((await watchCycle(state, options({ auto: true }))).needsDecision, undefined);
+
+    // The person says yes in the watch terminal.
+    state.approved.add(fingerprint(asked.needsDecision!.reviews[0]!));
+    state.dirty = true;
+    const after = await watchCycle(state, options({ auto: true }));
+    assert.equal(after.run?.moved, 1);
+    assert.ok(existsSync(join(inbox, "Installers/setup.pkg")));
+  });
+
+  it("asks once about a bulk batch and runs it when approved", async () => {
+    process.env.DZ_BULK_LIMIT = "2";
+    try {
+      const state = newWatchState();
+      await watchCycle(state, options({ auto: true }));
+      for (const name of ["a.pdf", "b.pdf", "c.pdf"]) await arrive(name);
+      const held = await watchCycle(state, options({ auto: true }));
+      assert.equal(held.needsDecision?.batch?.count, 3);
+      state.approvedBatches.add(held.needsDecision!.batch!.key);
+      state.dirty = true;
+      const after = await watchCycle(state, options({ auto: true }));
+      assert.equal(after.run?.moved, 3);
+    } finally {
+      delete process.env.DZ_BULK_LIMIT;
+    }
+  });
 });
+
+describe("notifications", () => {
+  it("escapes text for AppleScript", () => {
+    assert.equal(appleScriptString('Say "hi"\\now\nplease'), '"Say \\"hi\\"\\\\now please"');
+  });
+});
+
