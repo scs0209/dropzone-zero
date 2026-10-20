@@ -66,7 +66,7 @@ describe("parseClassification", () => {
     for (const raw of [
       "not json",
       "[]",
-      bad({ category: "spreadsheet" }),
+      bad({ category: "groceries" }),
       bad({ confidence: 1.4 }),
       bad({ confidence: "high" }),
       bad({ title: "!!!" }),

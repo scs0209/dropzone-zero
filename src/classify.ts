@@ -11,6 +11,10 @@ export const CATEGORIES = [
   "warranty",
   "statement",
   "note",
+  "document",
+  "spreadsheet",
+  "presentation",
+  "image",
   "calendar",
   "installer",
   "temp",
@@ -74,7 +78,11 @@ const CATEGORY_GUIDE: Record<Category, string> = {
   calendar: "calendar invite (.ics)",
   installer: "software installer or disk image (.dmg, .pkg, .exe, .msi)",
   temp: "temporary or lock file with no lasting value",
-  other: "anything else, including app settings and data exports",
+  document: "letter, contract, report, form, article, or paper that fits none of the above",
+  spreadsheet: "table or data export (.xlsx, .csv) that is not a bank statement",
+  presentation: "slide deck",
+  image: "graphic, diagram, logo, design, or illustration (not a camera photo or screenshot)",
+  other: "app settings, data files, or anything you cannot identify",
 };
 
 const FOLDERS: Record<Category, { base: string; monthly: boolean }> = {
@@ -90,7 +98,11 @@ const FOLDERS: Record<Category, { base: string; monthly: boolean }> = {
   calendar: { base: "Calendar", monthly: false },
   installer: { base: "Installers", monthly: false },
   temp: { base: "Temp", monthly: false },
-  other: { base: "Documents", monthly: false },
+  document: { base: "Documents", monthly: false },
+  spreadsheet: { base: "Documents/Spreadsheets", monthly: false },
+  presentation: { base: "Documents/Presentations", monthly: false },
+  image: { base: "Images", monthly: false },
+  other: { base: "Other", monthly: false },
 };
 
 export function buildPrompt(file: ScannedFile, content: ExtractedContent): string {
@@ -243,7 +255,15 @@ export async function classifyFile(
   const evidence = `${file.name}\n${content.text}`;
   const maxAttempts = 2;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const raw = await client.generate(prompt, content.image ? [content.image] : undefined);
+    let raw: string;
+    try {
+      raw = await client.generate(prompt, content.image ? [content.image] : undefined);
+    } catch (error) {
+      // Some images (CMYK JPEGs, mislabeled files) fail to decode. Classify those from
+      // name and size instead; without an image, a failure means the model itself is down.
+      if (!content.image) throw error;
+      return classifyFile(client, file, { ...content, image: undefined }, today);
+    }
     const parsed = parseClassification(raw, file, evidence, today);
     if (parsed) return { ...parsed, source: "model", attempts: attempt };
   }

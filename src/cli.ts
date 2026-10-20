@@ -50,7 +50,7 @@ const ACTION_ORDER = { move: 0, quarantine: 1, skip: 2 } as const;
 function printPlan(plan: PlanItem[], folder: string): void {
   const counts = summarize(plan);
   console.log(`Plan for ${plan.length} files in ${folder} (preview only, nothing was moved)\n`);
-  console.log(["ACTION".padEnd(10), "CONF", "CATEGORY".padEnd(10), "FILE".padEnd(38), "NEW PATH"].join("  "));
+  console.log(["ACTION".padEnd(10), "CONF", "CATEGORY".padEnd(12), "FILE".padEnd(38), "NEW PATH"].join("  "));
   const sorted = [...plan].sort((a, b) => ACTION_ORDER[a.action] - ACTION_ORDER[b.action] || a.name.localeCompare(b.name));
   for (const item of sorted) {
     const destination = item.target ? `-> ${item.target}` : "";
@@ -59,7 +59,7 @@ function printPlan(plan: PlanItem[], folder: string): void {
       [
         item.action.padEnd(10),
         item.confidence.toFixed(2),
-        (item.category ?? "-").padEnd(10),
+        (item.category ?? "-").padEnd(12),
         item.name.padEnd(38),
         destination + note,
       ].join("  "),
@@ -88,7 +88,8 @@ function printSummary(plan: PlanItem[], seconds: number): void {
   console.log(`Decided by:  ${countBy(plan, (i) => i.source)}`);
   console.log(`File types:  ${countBy(plan, (i) => contentKindOf(extname(i.name).toLowerCase()))}`);
   console.log(`Confidence:  ${countBy(plan.filter((i) => i.source !== "rule"), (i) => band(i.confidence))}`);
-  console.log(`Skipped:     ${countBy(plan.filter((i) => i.action === "skip"), (i) => i.reason.split(":")[0]!.replace(/\.$/, ""))}`);
+  const skipped = plan.filter((i) => i.action === "skip");
+  console.log(`Skipped:     ${skipped.length ? countBy(skipped, (i) => i.reason.split(":")[0]!.replace(/\.$/, "")) : "none"}`);
   console.log(`Time:        ${seconds.toFixed(1)} s${modelCalls ? ` (${(seconds / modelCalls).toFixed(1)} s per model call)` : ""}`);
 }
 

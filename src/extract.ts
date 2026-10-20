@@ -106,7 +106,8 @@ export async function extractContent(file: ScannedFile): Promise<ExtractedConten
     if (kind === "pdf") {
       // unpdf bundles a serverless build of Mozilla's PDF.js, so real-world PDFs
       // (compressed streams, embedded fonts) work, not only the simple demo files.
-      const pdf = await getDocumentProxy(new Uint8Array(await readFile(file.path)));
+      // verbosity 0 keeps PDF.js font and xref warnings out of the CLI output.
+      const pdf = await getDocumentProxy(new Uint8Array(await readFile(file.path)), { verbosity: 0 });
       const { text } = await extractPdfText(pdf, { mergePages: true });
       await pdf.cleanup();
       return { kind, ...clip(text) };

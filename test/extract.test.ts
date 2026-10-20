@@ -140,3 +140,23 @@ describe("vision", () => {
     assert.equal(parseClassification(silent, photo, photo.name)?.date, null);
   });
 });
+
+describe("vision fallback", () => {
+  it("classifies from metadata when the model cannot decode the image", async () => {
+    const calls: (string[] | undefined)[] = [];
+    const client: ModelClient = {
+      async generate(_prompt, images) {
+        calls.push(images);
+        if (images) throw new Error("Ollama returned HTTP 400: Failed to load image");
+        return JSON.stringify({ category: "photo", date: null, title: "IMG 9001 photo", visibleText: "", confidence: 0.6, reason: "Camera file name." });
+      },
+    };
+    const file: ScannedFile = {
+      name: "IMG_9001.jpg", path: "/inbox/IMG_9001.jpg", ext: ".jpg", size: 10, modifiedAt: new Date("2026-10-01T00:00:00Z"),
+      ageDays: 19, sha256: "0".repeat(64), partial: false,
+    };
+    const result = await classifyFile(client, file, { kind: "image", text: "", truncated: false, image: "eA==" });
+    assert.deepEqual(calls, [["eA=="], undefined]);
+    assert.equal(result.newName, "img-9001-photo.jpg");
+  });
+});
