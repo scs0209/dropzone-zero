@@ -115,6 +115,35 @@ describe("dz daemon API", () => {
   });
 });
 
+describe("dz daemon remote approval", () => {
+  it("sends each question to the phone without file names, and acts on the answer from there", async (t) => {
+    if (!listening) return t.skip("cannot bind a port here");
+    const folder = await mkdtemp(join(tmpdir(), "dz-daemon-remote-"));
+    const infoPath = join(await mkdtemp(join(tmpdir(), "dz-daemon-info-")), "daemon.json");
+    const asked: string[] = [];
+    let approve!: () => void;
+    const phone = {
+      ask: (message: string) => {
+        asked.push(message);
+        return new Promise<"approved">((resolve) => (approve = () => resolve("approved")));
+      },
+    };
+    const remote = new Daemon({ folder, model: "test", classify, port: 0, infoPath, settleMs: 0, debounceMs: 50, waitForModel: async () => {}, remoteApprover: phone });
+    await remote.start();
+    await remote.ready();
+    try {
+      await writeFile(join(folder, "secret-plans.pkg"), "installer");
+      await until(async () => remote.state().pending.length === 1);
+      assert.deepEqual(asked, ["Dropzone Zero: move 1 installer"]);
+      approve();
+      await until(async () => existsSync(join(folder, "Installers/secret-plans.pkg")));
+      assert.equal(remote.state().pending.length, 0);
+    } finally {
+      await remote.stop();
+    }
+  });
+});
+
 describe("dz daemon moods", () => {
   it("looks busy while the model reads a new download", async (t) => {
     if (!listening) return t.skip("cannot bind a port here");

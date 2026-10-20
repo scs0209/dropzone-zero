@@ -9,6 +9,7 @@ import { z } from "zod";
 import { lastUndoableRun, undoRun } from "./execute.js";
 import { fingerprint } from "./guard.js";
 import { recentMoves, type RecentMove } from "./recent.js";
+import type { RemoteApprover } from "./remote-approval.js";
 import { startWatching, type CycleResult, type WatchControl, type WatchOptions } from "./watch.js";
 
 // `dz daemon`: the watcher plus a small local API, so a desktop UI (the Zee
@@ -60,6 +61,8 @@ export interface DaemonOptions extends Omit<WatchOptions, "auto" | "inbox"> {
   /** Resolves when the model is reachable; the daemon is "dizzy" until then. */
   waitForModel: () => Promise<void>;
   onEvent?: (result: CycleResult) => void;
+  /** Also asks each question on the approver's phone (Auth0 CIBA); whichever answer comes first counts. */
+  remoteApprover?: Pick<RemoteApprover, "ask"> | null;
 }
 
 const DecideBody = z.object({ id: z.string().min(1), approve: z.boolean() });
@@ -84,6 +87,8 @@ export class Daemon {
   private recent: RecentMove[] = [];
   private lastRun: DaemonState["lastRun"] = null;
   private lastMessage = "Watching for new downloads.";
+  /** Questions also out on the approver's phone, so an answer in Zee can call them off. */
+  private remote = new Map<string, AbortController>();
   /** Resolves after the watcher's first pass, which records the files already in the folder. */
   private firstPass!: Promise<void>;
   private firstPassDone: () => void = () => {};
@@ -133,6 +138,8 @@ export class Daemon {
   }
 
   async stop(): Promise<void> {
+    for (const asking of this.remote.values()) asking.abort();
+    this.remote.clear();
     this.control?.stop();
     await new Promise<void>((resolveClose) => (this.server ? this.server.close(() => resolveClose()) : resolveClose()));
     await rm(this.options.infoPath ?? daemonInfoPath(), { force: true });
@@ -181,13 +188,49 @@ export class Daemon {
     // Every pass, not only after its own moves: the journal is the record, whoever wrote it.
     this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
     for (const item of result.needsDecision?.reviews ?? []) {
-      this.pending.push({ kind: "review", id: fingerprint(item), title: `${item.name} → ${item.target}`, detail: item.checks.join("; ") });
+      const id = fingerprint(item);
+      this.pending.push({ kind: "review", id, title: `${item.name} → ${item.target}`, detail: item.checks.join("; ") });
+      // The phone sees the kind of file only, never its name.
+      this.askRemotely(id, `Dropzone Zero: move 1 ${item.category ?? "file"}`);
     }
     const batch = result.needsDecision?.batch;
     if (batch) {
       this.pending.push({ kind: "batch", id: batch.key, title: `Move ${batch.count} new files at once`, detail: "More than the bulk limit arrived together." });
+      this.askRemotely(batch.key, `Dropzone Zero: move ${batch.count} new files`);
     }
     this.options.onEvent?.(result);
+  }
+
+  /** Answers a question, from Zee or from the phone. False if it was already answered. */
+  private decide(id: string, approve: boolean): boolean {
+    const decision = this.pending.find((p) => p.id === id);
+    if (!decision) return false;
+    this.pending = this.pending.filter((p) => p !== decision);
+    this.remote.get(id)?.abort();
+    this.remote.delete(id);
+    if (approve && decision.kind === "review") this.control?.approveItem(id);
+    if (approve && decision.kind === "batch") this.control?.approveBatch(id);
+    return true;
+  }
+
+  /** Sends a question to the approver's phone too; an unanswered push leaves it to Zee. */
+  private askRemotely(id: string, message: string): void {
+    const approver = this.options.remoteApprover;
+    if (!approver) return;
+    const asking = new AbortController();
+    this.remote.set(id, asking);
+    approver
+      .ask(message, asking.signal)
+      .then((answer) => {
+        if (asking.signal.aborted) return;
+        this.remote.delete(id);
+        if (answer === "approved" || answer === "denied") this.decide(id, answer === "approved");
+      })
+      .catch((error: unknown) => {
+        this.remote.delete(id);
+        // Zee still asks; the phone was only a second way to answer.
+        console.error(`Remote approval failed: ${error instanceof Error ? error.message : String(error)}`);
+      });
   }
 
   private authorized(req: IncomingMessage): boolean {
@@ -214,11 +257,7 @@ export class Daemon {
 
       if (route === "POST /decide") {
         const { id, approve } = DecideBody.parse(body);
-        const decision = this.pending.find((p) => p.id === id);
-        if (!decision) return send(res, 404, { error: "no such decision" });
-        this.pending = this.pending.filter((p) => p !== decision);
-        if (approve && decision.kind === "review") this.control?.approveItem(id);
-        if (approve && decision.kind === "batch") this.control?.approveBatch(id);
+        if (!this.decide(id, approve)) return send(res, 404, { error: "no such decision" });
         return send(res, 200, this.state());
       }
       if (route === "POST /reveal") {

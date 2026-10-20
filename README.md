@@ -163,6 +163,16 @@ Zee is the only thing that has to be launched. When it starts, it starts Ollama 
 
 Zee is a [Tauri](https://tauri.app) app: a Rust shell around the system WebView, so it is about 10 MB instead of shipping a browser. The robot is built from simple shapes in [three.js](https://threejs.org) (pinned, copied into the app at build time, no CDN) and renders at 30 frames per second when active and 12 when resting, so an always-on companion stays cheap. It never touches files. It talks to `dz daemon` over `127.0.0.1` with a random token that only your user can read (`~/.dropzone-zero/daemon.json`, mode 600), and the daemon refuses requests from any other web origin. Every click goes through the same guard and executor as the command line: **Move it** can only release a review item, and **Show in Finder** only opens files Dropzone Zero itself moved.
 
+### Approve from your phone (optional, Auth0)
+
+Away from the Mac, Zee can still ask. With the four `AUTH0_*` settings in `.env`, every question Zee asks (an installer, a low-confidence file, a batch over the bulk limit) also goes to the approver's phone as an Auth0 Guardian push, using Auth0's Client-Initiated Backchannel Authentication (CIBA). Approve or decline on the phone, or in Zee; whichever answer comes first counts, and the other question closes. An unanswered push changes nothing: Zee keeps asking.
+
+- **Only the kind of move leaves the machine:** the push says "Dropzone Zero: move 1 installer" or "move 23 new files", never a file name, path, or content.
+- **Nothing can reach the Mac:** the daemon only makes outgoing requests to Auth0 and polls for the answer. Its API still listens on 127.0.0.1 alone.
+- **An approval is still exactly one move:** it releases the same fingerprint-bound item as **Move it** in Zee, through the same guard and executor.
+
+Setup: create a Regular Web application in Auth0 (first-party), enable the CIBA grant with the Guardian push channel, turn on "Push Notification using Auth0 Guardian" under Security > Multi-factor Auth, and enroll the approving user in Guardian. Then set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_APPROVER_USER_ID`. Auth0's docs list CIBA under the Enterprise plan or an add-on; check that your tenant allows it.
+
 ## How a run stays safe
 
 - `dz run` executes exactly the plan you previewed. The model is not asked again, so what you saw is what happens.
