@@ -45,7 +45,8 @@ Usage:
                                  Put back single files; the review gate learns from it
   dz approve [folder] --file <name> | --all
                                  Release items the guard holds for review
-  dz watch [folder] [--auto]     Keep planning as files arrive; --auto runs allowed moves
+  dz watch [folder] [--auto] [--include-existing]
+                                 Keep planning as files arrive; --auto moves new files the guard allows
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
@@ -355,8 +356,9 @@ async function status(folder: string, json: boolean): Promise<void> {
 
 function printCycle(result: CycleResult): void {
   const time = new Date().toTimeString().slice(0, 8);
+  const existing = result.existing ? `; ${result.existing} files that were already here are left alone (\`dz tidy\` sorts them)` : "";
   if (result.planned === 0) {
-    console.log(`${time}  ${result.settling ? `waiting for ${result.settling} files to finish writing` : "nothing to plan"}`);
+    console.log(`${time}  ${result.settling ? `waiting for ${result.settling} ${result.settling === 1 ? "file" : "files"} to finish writing` : "nothing new"}${existing}`);
     return;
   }
   const settling = result.settling ? `, ${result.settling} still being written` : "";
@@ -373,16 +375,21 @@ function printCycle(result: CycleResult): void {
   }
 }
 
-async function watchFolder(folder: string, auto: boolean): Promise<void> {
+async function watchFolder(folder: string, auto: boolean, includeExisting: boolean): Promise<void> {
   const client = new OllamaClient();
   await client.ensureReady();
   console.log(
-    `Watching ${folder}. ${auto ? "Allowed moves run on their own; review and blocked items wait." : "Planning only; pass --auto to run allowed moves."} Press Ctrl+C to stop.`,
+    `Watching ${folder}. ${
+      auto
+        ? `New files that the guard allows move on their own${includeExisting ? ", and so do files already here" : "; files already here stay"}. Review and blocked items wait.`
+        : "Planning only; pass --auto to move new files."
+    } Press Ctrl+C to stop.`,
   );
   const stop = startWatching({
     inbox: folder,
     model: client.model,
     auto,
+    includeExisting,
     classify: async (file) => classifyFile(client, file, await extractContent(file)),
     onCycle: (result) => {
       recordCounts("dz.watch", { planned: result.planned, moved: result.run?.moved ?? 0 });
@@ -513,6 +520,7 @@ async function main(): Promise<void> {
       file: { type: "string", multiple: true },
       all: { type: "boolean" },
       auto: { type: "boolean" },
+      "include-existing": { type: "boolean" },
     },
   });
   const [command, folderArg] = positionals;
@@ -531,7 +539,7 @@ async function main(): Promise<void> {
   if (command === "worker") return startWorker();
   if (command === "status") return status(folder, json);
   if (command === "tidy") return tidy(folder, values.yes ?? false);
-  if (command === "watch") return watchFolder(folder, values.auto ?? false);
+  if (command === "watch") return watchFolder(folder, values.auto ?? false, values["include-existing"] ?? false);
   if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
   if (command === "receipts") return receipts(folder, values.out);
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");

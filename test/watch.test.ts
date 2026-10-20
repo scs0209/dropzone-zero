@@ -53,9 +53,11 @@ describe("watchCycle", () => {
   });
 
   it("with --auto runs allowed moves only", async () => {
+    const state = newWatchState();
+    await watchCycle(state, options({ auto: true }));
     await arrive("a.pdf");
     await arrive("setup.pkg");
-    const result = await watchCycle(newWatchState(), options({ auto: true }));
+    const result = await watchCycle(state, options({ auto: true }));
     assert.equal(result.run?.moved, 1);
     assert.ok(existsSync(join(inbox, "Finance/Receipts/2026-10/a.pdf")));
     assert.ok(existsSync(join(inbox, "setup.pkg")), "programs wait for review");
@@ -91,8 +93,10 @@ describe("watchCycle", () => {
   it("holds a bulk change for an explicit dz run", async () => {
     process.env.DZ_BULK_LIMIT = "2";
     try {
+      const state = newWatchState();
+      await watchCycle(state, options({ auto: true }));
       for (const name of ["a.pdf", "b.pdf", "c.pdf"]) await arrive(name);
-      const result = await watchCycle(newWatchState(), options({ auto: true }));
+      const result = await watchCycle(state, options({ auto: true }));
       assert.match(result.held ?? "", /bulk change/);
       assert.ok(existsSync(join(inbox, "a.pdf")));
     } finally {
@@ -102,6 +106,7 @@ describe("watchCycle", () => {
 
   it("keeps approvals across cycles and runs them with --auto", async () => {
     const state = newWatchState();
+    await watchCycle(state, options());
     await arrive("setup.pkg");
     await watchCycle(state, options());
     await approveItems(inbox, ["setup.pkg"]);
@@ -109,5 +114,39 @@ describe("watchCycle", () => {
     const result = await watchCycle(state, options({ auto: true }));
     assert.equal(result.run?.moved, 2);
     assert.ok(existsSync(join(inbox, "Installers/setup.pkg")));
+  });
+
+  it("leaves files that were there before watching started, and still files new arrivals", async () => {
+    await arrive("old.pdf");
+    const state = newWatchState();
+    const first = await watchCycle(state, options({ auto: true }));
+    assert.equal(first.existing, 1);
+    assert.equal(first.run, undefined);
+    await arrive("new.pdf");
+    const second = await watchCycle(state, options({ auto: true }));
+    assert.equal(second.run?.moved, 1);
+    assert.ok(existsSync(join(inbox, "old.pdf")), "the backlog stays put");
+    assert.ok(existsSync(join(inbox, "Finance/Receipts/2026-10/new.pdf")));
+  });
+
+  it("a cluttered folder no longer holds up a new download", async () => {
+    process.env.DZ_BULK_LIMIT = "2";
+    try {
+      for (const name of ["a.pdf", "b.pdf", "c.pdf", "d.pdf"]) await arrive(name);
+      const state = newWatchState();
+      await watchCycle(state, options({ auto: true }));
+      await arrive("fresh.pdf");
+      const result = await watchCycle(state, options({ auto: true }));
+      assert.equal(result.run?.moved, 1);
+      assert.equal(result.existing, 4);
+    } finally {
+      delete process.env.DZ_BULK_LIMIT;
+    }
+  });
+
+  it("moves the backlog too with --include-existing", async () => {
+    await arrive("old.pdf");
+    const result = await watchCycle(newWatchState(), options({ auto: true, includeExisting: true }));
+    assert.equal(result.run?.moved, 1);
   });
 });

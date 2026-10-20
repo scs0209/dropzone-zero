@@ -7,9 +7,11 @@ import { applyReviewGate, type Predictor } from "./review.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
 
 // `dz watch`: keeps planning as files arrive, and with --auto carries out what
-// the guard allows. The guard's rules do not loosen in watch mode: REVIEW items
-// wait for `dz approve`, BLOCK items never run, and a batch larger than the bulk
-// limit waits for an explicit `dz run`.
+// the guard allows for files that arrive while it is watching. Files that were
+// already in the folder are planned but left alone (`dz tidy` sorts them), so a
+// cluttered folder never holds up a new download. The guard's rules do not
+// loosen in watch mode: REVIEW items wait for `dz approve`, BLOCK items never
+// run, and a batch larger than the bulk limit waits for an explicit `dz run`.
 
 /** A file modified more recently than this is probably still being written. */
 export const DEFAULT_SETTLE_MS = 5_000;
@@ -24,6 +26,8 @@ export interface WatchOptions {
   settleMs?: number;
   predictor?: Predictor;
   now?: () => number;
+  /** Also auto-move files that were already there when watching started. */
+  includeExisting?: boolean;
 }
 
 export interface CycleResult {
@@ -35,6 +39,8 @@ export interface CycleResult {
   allowed: number;
   review: number;
   blocked: number;
+  /** Allowed files that were already there when watching started, left for `dz tidy`. */
+  existing: number;
   /** Why an --auto cycle did not run, if it did not. */
   held?: string;
   run?: RunResult;
@@ -45,10 +51,12 @@ export interface WatchState {
   cache: Map<string, ClassifyResult>;
   /** Names, sizes, and times of the settled files the last cycle saw. */
   signature: string;
+  /** Files (name and hash) present when watching started; null until the first cycle. */
+  baseline: Set<string> | null;
 }
 
 export function newWatchState(): WatchState {
-  return { cache: new Map(), signature: "" };
+  return { cache: new Map(), signature: "", baseline: null };
 }
 
 /** Approvals from the previous plan stay valid if the move they approved is still exactly the same. */
@@ -66,15 +74,21 @@ async function carryOverApprovals(inbox: string, plan: PlanItem[]): Promise<void
 export async function watchCycle(state: WatchState, options: WatchOptions): Promise<CycleResult> {
   const { inbox, settleMs = DEFAULT_SETTLE_MS, now = Date.now } = options;
   const scanned = await scanFolder(inbox);
+  state.baseline ??= new Set(scanned.map((f) => `${f.name}\n${f.sha256}`));
   const settled = scanned.filter((f) => now() - f.modifiedAt.getTime() >= settleMs);
   // Which files have settled is part of the signature: a file that finished writing is news.
   const signature = settled.map((f) => `${f.name}\n${f.size}\n${f.modifiedAt.getTime()}`).join("\n") + `\n#${scanned.length}`;
-  const empty = { planned: 0, newlyClassified: 0, settling: 0, allowed: 0, review: 0, blocked: 0 };
+  const empty = { planned: 0, newlyClassified: 0, settling: 0, allowed: 0, review: 0, blocked: 0, existing: 0 };
   if (signature === state.signature) return { unchanged: true, ...empty };
   state.signature = signature;
 
+  // In --auto mode the files that were already here are left alone, so they are not
+  // even sent to the model: a new download never waits behind a cluttered folder.
+  const isNewFile = (f: { name: string; sha256: string }) => !state.baseline!.has(`${f.name}\n${f.sha256}`);
+  const leaveExisting = options.auto && !options.includeExisting;
+  const candidates = leaveExisting ? settled.filter(isNewFile) : settled;
   let newlyClassified = 0;
-  const plan = await buildPlan(settled, {
+  const plan = await buildPlan(candidates, {
     inbox,
     classify: async (file) => {
       const cached = state.cache.get(file.sha256);
@@ -98,16 +112,17 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
     allowed: plan.filter((i) => i.verdict === "allow").length,
     review: plan.filter((i) => i.verdict === "review").length,
     blocked: plan.filter((i) => i.verdict === "block").length,
+    existing: settled.length - candidates.length,
   };
   if (!options.auto) return result;
 
   const runnable = movableItems(plan);
   if (runnable.length === 0) {
-    return { ...result, held: result.review ? `${result.review} waiting for review (\`dz approve\`)` : "nothing to move" };
+    return { ...result, held: result.review ? `${result.review} waiting for review (\`dz approve\`)` : "nothing new to move" };
   }
-  if (batchNeedsApproval(plan)) return { ...result, held: `bulk change (${runnable.length} files); confirm with \`dz run\`` };
+  if (batchNeedsApproval(runnable)) return { ...result, held: `bulk change (${runnable.length} files); confirm with \`dz run\`` };
   // The plan was just written, so this runs exactly what was saved.
-  return { ...result, run: await executePlan(inbox, plan) };
+  return { ...result, run: await executePlan(inbox, runnable) };
 }
 
 /**

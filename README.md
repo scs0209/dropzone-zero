@@ -95,13 +95,17 @@ Mastra orchestrates the steps; it never gets a say in what may happen to a file.
 
 ```bash
 pnpm dz watch ~/Downloads --auto
-# 11:16:19  waiting for 2 files to finish writing
-# 11:16:30  2 planned (2 new to the model): 1 allowed, 1 review, 0 blocked
-# 11:16:30  moved 1 file (run 20261020T021630707Z); `dz undo` reverses it
-# 11:16:32  not running: 1 waiting for review (`dz approve`)
+# 12:49:27  nothing new; 30 files that were already here are left alone (`dz tidy` sorts them)
+# 12:49:37  waiting for 1 file to finish writing; 30 files that were already here are left alone
+# 12:49:46  1 planned (1 new to the model): 1 allowed, 0 review, 0 blocked
+# 12:49:46  moved 1 file (run 20261020T034946551Z); `dz undo` reverses it
 ```
 
-Watch mode does not loosen anything. Without `--auto` it only plans. With it, only `ALLOW` items move; `REVIEW` items wait for `dz approve` (approvals carry over between passes as long as the move is unchanged), `BLOCK` items never move, and if the allowed batch is larger than the bulk limit, nothing moves until you confirm with `dz run`. That makes the intended routine: clean up the backlog once with `dz preview` and `dz run`, then let `dz watch --auto` keep up with new downloads.
+That run is a Chrome-style download (a `.crdownload` file renamed when finished) of a photographed receipt landing in a folder that already held 30 files: eleven seconds after the download completed, it was in `Finance/Receipts/2026-10/2026-10-11-juniper-market-purchase-receipt.jpg`.
+
+With `--auto`, only files that arrive after watching starts are moved. Files that were already in the folder are not even sent to the model, so a cluttered Downloads folder never makes a new download wait; sort the backlog with `dz tidy` whenever you like, or pass `--include-existing` to let watch handle it too.
+
+Watch mode does not loosen anything. Without `--auto` it only plans. With it, only `ALLOW` items move; `REVIEW` items wait for `dz approve` (approvals carry over between passes as long as the move is unchanged), `BLOCK` items never move, and if the allowed batch is larger than the bulk limit, nothing moves until you confirm with `dz run`. While it runs, watch owns the saved plan, so use `dz tidy` for the backlog before or after a watch session rather than during it.
 
 ## How a run stays safe
 
