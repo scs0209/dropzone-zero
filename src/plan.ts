@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { extname, join } from "node:path";
-import type { Category, ClassifyResult } from "./classify.js";
+import { z } from "zod";
+import { CATEGORIES, type ClassifyResult } from "./classify.js";
 import { applyJudgement, isExecutable, type Verdict } from "./guard.js";
 import { applyRules, type Action } from "./rules.js";
 import type { ScannedFile } from "./scan.js";
@@ -11,29 +12,32 @@ export const STATE_DIR = ".dropzone";
 /** Inside the inbox and hidden, so scans skip it. The user empties it; Dropzone Zero never deletes. */
 export const QUARANTINE_DIR = `${STATE_DIR}/quarantine`;
 
-export interface PlanItem {
-  name: string;
+/** One planned file. The schema validates saved plans on load; the type is inferred from it. */
+export const PlanItemSchema = z.object({
+  name: z.string().min(1),
   /** Content hash at planning time; `dz run` refuses to move a file that changed since. */
-  sha256: string;
-  size: number;
-  ageDays: number;
-  action: Action;
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  size: z.number().int().nonnegative(),
+  ageDays: z.number().int(),
+  action: z.enum(["move", "quarantine", "skip"]),
   /** Null when a rule decided without asking the model. */
-  category: Category | null;
+  category: z.enum(CATEGORIES).nullable(),
   /** Destination relative to the inbox; null for skipped files. */
-  target: string | null;
-  confidence: number;
-  reason: string;
-  source: "rule" | "model" | "fallback";
+  target: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+  reason: z.string(),
+  source: z.enum(["rule", "model", "fallback"]),
   /** Programs and installers, by extension or execute bit. */
-  executable: boolean;
+  executable: z.boolean(),
   /** The guardrail engine's decision; see guard.ts. */
-  verdict: Verdict;
+  verdict: z.enum(["allow", "review", "block"]),
   /** Why the item needs review or is blocked. */
-  checks: string[];
+  checks: z.array(z.string()),
   /** Set by `dz approve`; only valid while the fingerprint matches this exact move. */
-  approval?: { at: string; fingerprint: string };
-}
+  approval: z.object({ at: z.string(), fingerprint: z.string() }).optional(),
+});
+
+export type PlanItem = z.infer<typeof PlanItemSchema>;
 
 export interface BuildPlanOptions {
   inbox: string;

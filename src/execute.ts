@@ -2,19 +2,22 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rmdir, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { z } from "zod";
 import { checkBeforeMove, checkBeforeRestore, fingerprint, isRunnable } from "./guard.js";
 import { Journal, newRunId, readJournal } from "./journal.js";
-import { STATE_DIR, type PlanItem } from "./plan.js";
+import { PlanItemSchema, STATE_DIR, type PlanItem } from "./plan.js";
 import { hashFile } from "./scan.js";
 
-export interface SavedPlan {
-  inbox: string;
-  createdAt: string;
-  model: string;
-  items: PlanItem[];
+export const SavedPlanSchema = z.object({
+  inbox: z.string(),
+  createdAt: z.string(),
+  model: z.string(),
+  items: z.array(PlanItemSchema),
   /** SHA-256 of the items as Dropzone Zero wrote them; any other edit invalidates the plan. */
-  digest: string;
-}
+  digest: z.string(),
+});
+
+export type SavedPlan = z.infer<typeof SavedPlanSchema>;
 
 function planDigest(items: PlanItem[]): string {
   return createHash("sha256").update(JSON.stringify(items)).digest("hex");
@@ -46,11 +49,16 @@ export async function loadPlan(inbox: string): Promise<SavedPlan | null> {
   } catch {
     return null;
   }
-  const plan = JSON.parse(text) as SavedPlan;
-  if (plan.digest !== planDigest(plan.items)) {
+  // The digest covers the items exactly as written, so check it before parsing reorders anything.
+  const raw = JSON.parse(text) as { digest?: unknown; items?: PlanItem[] };
+  if (!Array.isArray(raw.items) || raw.digest !== planDigest(raw.items)) {
     throw new PlanTamperedError("The saved plan was changed outside Dropzone Zero. Run `dz preview` again.");
   }
-  return plan;
+  const parsed = SavedPlanSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new PlanTamperedError("The saved plan is not in the expected format. Run `dz preview` again.");
+  }
+  return parsed.data;
 }
 
 /** Approves review items for this exact move (content, action, target). Returns the names approved. */

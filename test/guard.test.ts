@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, it } from "node:test";
 import { approveItems, executePlan, loadPlan, moveOne, planPath, savePlan } from "../src/execute.js";
+import { CLASSIFICATION_SCHEMA } from "../src/classify.js";
 import { batchNeedsApproval, fingerprint, isRunnable, judge } from "../src/guard.js";
 import type { PlanItem } from "../src/plan.js";
 import { hashFile } from "../src/scan.js";
@@ -118,6 +119,18 @@ describe("saved plan integrity", () => {
     const text = await readFile(planPath(inbox), "utf8");
     await writeFile(planPath(inbox), text.replace("Documents/a.pdf", "../stolen.pdf"));
     await assert.rejects(loadPlan(inbox), /changed outside Dropzone Zero/);
+  });
+});
+
+describe("saved plan schema", () => {
+  it("refuses a well-signed plan with values Dropzone Zero never writes", async () => {
+    const bad = { ...(await item("a.pdf", "Documents/a.pdf")), verdict: "maybe" } as unknown as PlanItem;
+    await savePlan(inbox, "test", [bad]);
+    await assert.rejects(loadPlan(inbox), /not in the expected format/);
+  });
+
+  it("derives the model's JSON schema from the same Zod contract", () => {
+    assert.deepEqual(CLASSIFICATION_SCHEMA.required, ["category", "date", "title", "visibleText", "confidence", "reason"]);
   });
 });
 

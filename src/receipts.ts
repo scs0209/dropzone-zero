@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { isDateWritten, normalizeDate, type ModelClient } from "./classify.js";
+import { z } from "zod";
+import { isDateWritten, normalizeDate, readJsonReply, type ModelClient } from "./classify.js";
 import { loadPlan } from "./execute.js";
 import type { ExtractedContent } from "./extract.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
@@ -36,18 +37,16 @@ export interface ReceiptRow {
   status: string;
 }
 
-export const RECEIPT_SCHEMA = {
-  type: "object",
-  properties: {
-    vendor: { type: ["string", "null"] },
-    date: { type: ["string", "null"] },
-    total: { type: ["number", "null"] },
-    currency: { type: ["string", "null"] },
-    documentNumber: { type: ["string", "null"] },
-    visibleText: { type: "string" },
-  },
-  required: ["vendor", "date", "total", "currency", "documentNumber", "visibleText"],
-} as const;
+export const ReceiptReply = z.object({
+  vendor: z.string().nullable(),
+  date: z.string().nullable(),
+  total: z.number().nullable(),
+  currency: z.string().nullable(),
+  documentNumber: z.string().nullable(),
+  visibleText: z.string().default(""),
+});
+
+export const RECEIPT_SCHEMA = z.toJSONSchema(ReceiptReply);
 
 async function walk(dir: string): Promise<string[]> {
   if (!existsSync(dir)) return [];
@@ -115,15 +114,10 @@ function cleanText(value: unknown, max: number): string | null {
 
 /** Validates the model's answer and keeps only values that appear in the document. */
 export function parseReceipt(raw: string, evidence: string): Omit<ReceiptRow, "kind" | "file"> | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
-  } catch {
-    return null;
-  }
-  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
-  const fields = data as Record<string, unknown>;
-  const seen = typeof fields.visibleText === "string" ? `${evidence}\n${fields.visibleText}` : evidence;
+  const reply = ReceiptReply.safeParse(readJsonReply(raw));
+  if (!reply.success) return null;
+  const fields = reply.data;
+  const seen = `${evidence}\n${fields.visibleText}`;
   const problems: string[] = [];
 
   const date = normalizeDate(fields.date);

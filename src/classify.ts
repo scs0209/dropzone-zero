@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ExtractedContent } from "./extract.js";
 import type { ScannedFile } from "./scan.js";
 
@@ -52,18 +53,26 @@ export interface ModelClient {
  * (category, date, a short title), and the folder and final name are built here,
  * so a 4B model cannot invent folder layouts or stamp today's date on a manual.
  */
-export const CLASSIFICATION_SCHEMA = {
-  type: "object",
-  properties: {
-    category: { type: "string", enum: CATEGORIES },
-    date: { type: ["string", "null"] },
-    title: { type: "string" },
-    visibleText: { type: "string" },
-    confidence: { type: "number", minimum: 0, maximum: 1 },
-    reason: { type: "string" },
-  },
-  required: ["category", "date", "title", "visibleText", "confidence", "reason"],
-} as const;
+export const ClassificationReply = z.object({
+  category: z.enum(CATEGORIES),
+  date: z.string().nullable(),
+  title: z.string(),
+  visibleText: z.string().default(""),
+  confidence: z.number().min(0).max(1),
+  reason: z.string(),
+});
+
+/** The same contract as JSON Schema, for Ollama's structured output. One source, so the two cannot drift. */
+export const CLASSIFICATION_SCHEMA = z.toJSONSchema(ClassificationReply);
+
+/** Parses a model reply as JSON. Small models sometimes wrap it in a Markdown fence despite instructions. */
+export function readJsonReply(raw: string): unknown {
+  try {
+    return JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
+  } catch {
+    return undefined;
+  }
+}
 
 const CATEGORY_GUIDE: Record<Category, string> = {
   receipt: "proof of a payment already made (shop, taxi, order confirmation)",
@@ -202,28 +211,18 @@ export function parseClassification(
   evidence: string,
   today = new Date(),
 ): Classification | null {
-  let data: unknown;
-  try {
-    // Small models sometimes wrap JSON in a Markdown fence despite instructions.
-    data = JSON.parse(raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
-  } catch {
-    return null;
-  }
-  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
-  const { category, date, title, visibleText, confidence, reason } = data as Record<string, unknown>;
-
-  if (typeof category !== "string" || !(CATEGORIES as readonly string[]).includes(category)) return null;
-  if (typeof title !== "string" || typeof reason !== "string") return null;
-  if (typeof confidence !== "number" || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) return null;
+  const reply = ClassificationReply.safeParse(readJsonReply(raw));
+  if (!reply.success) return null;
+  const { category, date, title, visibleText, confidence, reason } = reply.data;
 
   const validDate = normalizeDate(date, today);
-  const seen = typeof visibleText === "string" ? `${evidence}\n${visibleText}` : evidence;
+  const seen = `${evidence}\n${visibleText}`;
   const cleanDate = validDate && isDateWritten(validDate, seen) ? validDate : null;
-  const target = fileTarget(category as Category, cleanDate, title, file);
+  const target = fileTarget(category, cleanDate, title, file);
   if (!target) return null;
 
   return {
-    category: category as Category,
+    category,
     date: cleanDate,
     ...target,
     confidence,
