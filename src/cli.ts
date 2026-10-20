@@ -548,6 +548,12 @@ async function main(): Promise<void> {
   process.exitCode = 1;
 }
 
+// Optional settings (SENTRY_DSN, DZ_MODEL, ...) from .env; silent when there is none.
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // No .env: defaults apply.
+}
 await initTelemetry();
 try {
   await main();
