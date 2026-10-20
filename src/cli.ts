@@ -26,6 +26,7 @@ import { buildPlan, summarize, type PlanItem } from "./plan.js";
 import { extractReceipt, findReceiptFiles, toCsv, type ReceiptRow } from "./receipts.js";
 import { applyReviewGate, type GateResult } from "./review.js";
 import { countStates, latestRun, plannedStates, runStates, type ItemStatus } from "./status.js";
+import { startWatching, type CycleResult } from "./watch.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
 import { captureError, flushTelemetry, initTelemetry, recordCounts, recordDuration, withSpan } from "./telemetry.js";
 
@@ -43,6 +44,7 @@ Usage:
                                  Put back single files; the review gate learns from it
   dz approve [folder] --file <name> | --all
                                  Release items the guard holds for review
+  dz watch [folder] [--auto]     Keep planning as files arrive; --auto runs allowed moves
   dz status [folder] [--json]    Show where every file stands: planned, waiting, verified, failed
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
@@ -300,6 +302,55 @@ async function status(folder: string, json: boolean): Promise<void> {
   }
 }
 
+function printCycle(result: CycleResult): void {
+  const time = new Date().toTimeString().slice(0, 8);
+  if (result.planned === 0) {
+    console.log(`${time}  ${result.settling ? `waiting for ${result.settling} files to finish writing` : "nothing to plan"}`);
+    return;
+  }
+  const settling = result.settling ? `, ${result.settling} still being written` : "";
+  console.log(
+    `${time}  ${result.planned} planned (${result.newlyClassified} new to the model)${settling}: ` +
+      `${result.allowed} allowed, ${result.review} review, ${result.blocked} blocked`,
+  );
+  if (result.run) {
+    const files = result.run.moved === 1 ? "file" : "files";
+    console.log(`${time}  moved ${result.run.moved} ${files} (run ${result.run.run}); \`dz undo\` reverses it`);
+    printFailures(result.run.failed);
+  } else if (result.held) {
+    console.log(`${time}  not running: ${result.held}`);
+  }
+}
+
+async function watchFolder(folder: string, auto: boolean): Promise<void> {
+  const client = new OllamaClient();
+  await client.ensureReady();
+  console.log(
+    `Watching ${folder}. ${auto ? "Allowed moves run on their own; review and blocked items wait." : "Planning only; pass --auto to run allowed moves."} Press Ctrl+C to stop.`,
+  );
+  const stop = startWatching({
+    inbox: folder,
+    model: client.model,
+    auto,
+    classify: async (file) => classifyFile(client, file, await extractContent(file)),
+    onCycle: (result) => {
+      recordCounts("dz.watch", { planned: result.planned, moved: result.run?.moved ?? 0 });
+      printCycle(result);
+    },
+    onError: (error) => {
+      captureError(error);
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    },
+  });
+  await new Promise<void>((resolveStop) => {
+    process.once("SIGINT", () => {
+      stop();
+      console.log("\nStopped watching.");
+      resolveStop();
+    });
+  });
+}
+
 async function approve(folder: string, files: string[], all: boolean): Promise<void> {
   if (!all && files.length === 0) throw new Error("Name the files to approve with --file <name>, or pass --all.");
   const { approved, unmatched } = await approveItems(folder, all ? "all" : files);
@@ -410,6 +461,7 @@ async function main(): Promise<void> {
       out: { type: "string" },
       file: { type: "string", multiple: true },
       all: { type: "boolean" },
+      auto: { type: "boolean" },
     },
   });
   const [command, folderArg] = positionals;
@@ -427,6 +479,7 @@ async function main(): Promise<void> {
   if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
   if (command === "status") return status(folder, json);
+  if (command === "watch") return watchFolder(folder, values.auto ?? false);
   if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
   if (command === "receipts") return receipts(folder, values.out);
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");

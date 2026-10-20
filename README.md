@@ -40,6 +40,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz undo [folder]` | Reverses the most recent run: files go back to their old names and places, and folders the run created are removed if empty |
 | `dz undo [folder] --file <name>` | Moves single files from the last run back (by old name, new name, or new path) and teaches the review gate that this move was wrong |
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
+| `dz watch [folder] [--auto]` | Keeps planning as files arrive. With `--auto`, allowed moves run on their own; review and blocked items still wait |
 | `dz status [folder]` | Shows where every file stands: planned, needs review, approved, blocked, executing, verified, failed, or restored |
 | `dz approve [folder] --file <name>` | Releases an item the guard holds for review, for exactly the move shown (`--all` releases every review item) |
 | `dz receipts [folder]` | Reads every receipt and invoice and writes date, vendor, total, currency, and document number to a CSV |
@@ -71,6 +72,20 @@ The executor does not trust the plan file either. Right before each rename it ju
 Runs of more than 20 allowed moves (`DZ_BULK_LIMIT`) are reported as bulk changes, which is where a second approval step plugs in.
 
 Each file moves through explicit states: `planned` or `needs-review` → `approved` → `executing` → `verified` (or `failed`), and `restored` after an undo; `blocked` never moves. The states are replayed from the saved plan and the append-only journal rather than stored separately, so they cannot drift from what actually happened. A file left in `executing` means a run stopped between the rename and its check, and `dz status` says how to finish or reverse it.
+
+## Watching the folder
+
+`dz watch` plans again whenever the folder changes, so a new download is classified seconds after it lands. It uses Node's built-in `fs.watch`, waits for a burst of events to settle, and leaves a file alone until it has stopped changing for five seconds, so half-written downloads are never planned. Each file is shown to the model once; later passes reuse the answer by content hash.
+
+```bash
+pnpm dz watch ~/Downloads --auto
+# 11:16:19  waiting for 2 files to finish writing
+# 11:16:30  2 planned (2 new to the model): 1 allowed, 1 review, 0 blocked
+# 11:16:30  moved 1 file (run 20261020T021630707Z); `dz undo` reverses it
+# 11:16:32  not running: 1 waiting for review (`dz approve`)
+```
+
+Watch mode does not loosen anything. Without `--auto` it only plans. With it, only `ALLOW` items move; `REVIEW` items wait for `dz approve` (approvals carry over between passes as long as the move is unchanged), `BLOCK` items never move, and if the allowed batch is larger than the bulk limit, nothing moves until you confirm with `dz run`. That makes the intended routine: clean up the backlog once with `dz preview` and `dz run`, then let `dz watch --auto` keep up with new downloads.
 
 ## How a run stays safe
 
@@ -156,6 +171,10 @@ Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves,
 - [x] `dz run` with hash checks before and after every move, journaled
 - [x] `dz undo` from the journal
 - [x] Run and undo as a durable Temporal workflow, so a crash or reboot resumes where it stopped
+- [x] Guardrail engine with ALLOW / REVIEW / BLOCK verdicts, checked again by the executor
+- [x] `dz watch` with `--auto` for allowed moves only
+- [ ] Batch approval on your phone through Auth0 for AI Agents (asynchronous authorization), showing counts only
+- [ ] Read-only dashboard of the synthetic demo, deployed on Render
 - [x] Gemma vision for photos and screenshots (Ollama's `images` field)
 - [ ] Vision for scanned PDFs that have no text layer (render the first page to an image)
 - [ ] [Mastra](https://mastra.ai) agent wrapper. Not added yet: today the classifier is one structured call per file with no tools, and Mastra's agent would need an extra AI SDK provider for Ollama to do the same thing. It becomes worthwhile once the agent has tools to call (journal lookups, receipt-to-CSV, calendar follow-ups).
