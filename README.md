@@ -15,13 +15,14 @@ Receipts, booking confirmations, photos, manuals, and half-finished downloads pi
 
 ## Quick start
 
-Requires Node.js 22.2 or newer, [pnpm](https://pnpm.io), and [Ollama](https://ollama.com) for the local model.
+Requires Node.js 22.2 or newer, [pnpm](https://pnpm.io), and [Ollama](https://ollama.com) for the local model. The optional review gate also needs [uv](https://docs.astral.sh/uv/).
 
 ```bash
 pnpm install
 ollama pull gemma4:e4b  # about 6.6 GB, once
 ollama serve            # skip if the Ollama app is already running
 pnpm seed               # creates demo/inbox with 31 synthetic files
+pnpm seed:history       # optional: synthetic past decisions for the review gate
 pnpm dz preview demo/inbox
 pnpm dz run demo/inbox      # asks before moving anything
 pnpm dz undo demo/inbox     # puts every file back
@@ -37,6 +38,7 @@ On an Apple Silicon laptop the 31-file demo preview takes about 70 to 100 second
 | `dz preview [folder]` | Plans a new name and folder for every file with the local model and saves the plan. Nothing moves |
 | `dz run [folder]` | Carries out the saved plan after you confirm, verifying each file by hash before and after it moves |
 | `dz undo [folder]` | Reverses the most recent run: files go back to their old names and places, and folders the run created are removed if empty |
+| `dz undo [folder] --file <name>` | Moves single files from the last run back (by old name, new name, or new path) and teaches the review gate that this move was wrong |
 | `dz worker` | Runs a Temporal worker that finishes any `--temporal` run or undo that was interrupted |
 | `dz receipts [folder]` | Reads every receipt and invoice and writes date, vendor, total, currency, and document number to a CSV |
 
@@ -50,6 +52,27 @@ Dropzone Zero keeps its state in a hidden `.dropzone` folder inside the folder i
 - A file is skipped, not moved, if it changed since the preview, if its target already exists, or if a target would leave the folder.
 - Every move is a rename inside the same folder tree: no copy, no delete, and the file is never in two places or none. The journal records each move as "started" before the rename and "done" after the new location is hashed, so even a run interrupted mid-move can be undone.
 - `dz undo` moves a file back only if it still has the hash it was moved with and its old place is free. If you edited a file after the run, undo leaves it where it is and tells you.
+
+## A review gate that learns what you undo
+
+Everyone files differently. Some people keep installers in Downloads until setup is done; some never want screenshots sorted. Rather than adding settings for every habit, Dropzone Zero watches what you put back.
+
+- `dz undo --file <name>` moves one file back and records it as a rejected move. Moves you leave alone count as accepted. (Undoing a whole run teaches nothing; that usually means "not now", not "wrong place".)
+- Once a folder has at least 20 decisions with at least 3 of each kind, `dz preview` asks [TabPFN](https://priorlabs.ai), a tabular foundation model, how likely each planned move is to be put back. TabPFN learns from a small table in a single forward pass, with no training loop, which is what makes it practical for a few dozen personal decisions.
+- Moves that are more likely rejected than not are held: they show up as `skip` with the reason and the planned target, and nothing moves until you decide.
+
+The gate only sees metadata: extension, file type, category, confidence, size, age, and the shape of the planned target. It never sees names or contents, and it runs locally through [uv](https://docs.astral.sh/uv/) with the TabPFN v2 weights, which need no account or API key. The first preview that uses it creates `ml/.venv` (about 1 GB, mostly PyTorch) and downloads the weights once. Set `DZ_REVIEW_GATE=off` to skip it.
+
+To see it on the demo, give the demo folder a synthetic past in which a fictional user kept moving installers back:
+
+```bash
+pnpm seed && pnpm seed:history
+pnpm dz preview demo/inbox
+# skip  installer  Notely-4.2.1.dmg   (Review: you moved back similar files before (81% likely). Planned: Installers/...)
+# Review gate: 2 held for review, learned from 90 decisions (10 moved back).
+```
+
+Built with TabPFN. The v2 weights are under the [Prior Labs License](https://huggingface.co/Prior-Labs/TabPFN-v2-clf/blob/main/LICENSE.txt) (Apache 2.0 with an additional attribution requirement); newer TabPFN weights need a license acceptance and an API key, so Dropzone Zero does not use them.
 
 ## Receipts to CSV
 

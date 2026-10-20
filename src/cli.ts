@@ -12,6 +12,7 @@ import {
   loadPlan,
   movableItems,
   savePlan,
+  undoFiles,
   undoRun,
   type RunResult,
   type UndoResult,
@@ -21,6 +22,7 @@ import { newRunId } from "./journal.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
 import { buildPlan, summarize, type PlanItem } from "./plan.js";
 import { extractReceipt, findReceiptFiles, toCsv, type ReceiptRow } from "./receipts.js";
+import { applyReviewGate, type GateResult } from "./review.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
 import { captureError, flushTelemetry, initTelemetry, recordCounts, recordDuration, withSpan } from "./telemetry.js";
 
@@ -34,6 +36,8 @@ Usage:
                                  Carry out the last preview, verifying every move
   dz undo [folder] [--yes] [--temporal]
                                  Put back everything the last run moved
+  dz undo [folder] --file <name> [--file <name> ...]
+                                 Put back single files; the review gate learns from it
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
                                  Export vendor, date, and total of receipts and invoices to CSV
@@ -48,6 +52,7 @@ Environment:
   DZ_INBOX      Folder to organize (default ~/Downloads)
   OLLAMA_HOST   Ollama server (default http://127.0.0.1:11434)
   DZ_MODEL      Ollama model (default gemma4:e4b)
+  DZ_REVIEW_GATE  Set to "off" to skip the local TabPFN review gate
   TEMPORAL_ADDRESS  Temporal server for --temporal (default 127.0.0.1:7233)
   SENTRY_DSN    Optional; sends only aggregate counts and timings
 `;
@@ -72,7 +77,7 @@ function flagsOf(file: ScannedFile): string {
 
 const ACTION_ORDER = { move: 0, quarantine: 1, skip: 2 } as const;
 
-function printPlan(plan: PlanItem[], folder: string): void {
+function printPlan(plan: PlanItem[], folder: string, gate: GateResult): void {
   const counts = summarize(plan);
   console.log(`Plan for ${plan.length} files in ${folder} (preview only, nothing was moved)\n`);
   console.log(["ACTION".padEnd(10), "CONF", "CATEGORY".padEnd(12), "FILE".padEnd(38), "NEW PATH"].join("  "));
@@ -91,6 +96,7 @@ function printPlan(plan: PlanItem[], folder: string): void {
     );
   }
   console.log(`\n${counts.move} to move, ${counts.quarantine} to quarantine, ${counts.skip} to skip.`);
+  console.log(`Review gate: ${gate.status === "on" ? `${gate.flagged} held for review, ` : ""}${gate.note}.`);
   console.log("Run `dz run` to carry out this plan; `dz undo` reverses it.");
 }
 
@@ -104,7 +110,7 @@ function countBy<T>(items: T[], key: (item: T) => string): string {
 }
 
 /** Aggregates only, so the output is safe to paste into an issue or a chat about a real folder. */
-function printSummary(plan: PlanItem[], seconds: number): void {
+function printSummary(plan: PlanItem[], seconds: number, gate: GateResult): void {
   const counts = summarize(plan);
   const modelCalls = plan.filter((item) => item.source !== "rule").length;
   const band = (c: number) => (c < 0.5 ? "under 0.5" : c < 0.8 ? "0.5-0.8" : "0.8+");
@@ -116,6 +122,7 @@ function printSummary(plan: PlanItem[], seconds: number): void {
   console.log(`Confidence:  ${countBy(plan.filter((i) => i.source !== "rule"), (i) => band(i.confidence))}`);
   const skipped = plan.filter((i) => i.action === "skip");
   console.log(`Skipped:     ${skipped.length ? countBy(skipped, (i) => i.reason.split(":")[0]!.replace(/\.$/, "")) : "none"}`);
+  console.log(`Review gate: ${gate.status}, ${gate.flagged} held; ${gate.note}`);
   console.log(`Time:        ${seconds.toFixed(1)} s${modelCalls ? ` (${(seconds / modelCalls).toFixed(1)} s per model call)` : ""}`);
 }
 
@@ -148,11 +155,13 @@ async function preview(folder: string, format: "table" | "json" | "summary"): Pr
     fallback: plan.filter((item) => item.source === "fallback").length,
   });
 
+  const gate = await withSpan("dz.review_gate", () => applyReviewGate(folder, plan));
+  recordCounts("dz.review_gate", { flagged: gate.flagged });
   await savePlan(folder, client.model, plan);
 
   if (format === "json") process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
-  else if (format === "summary") printSummary(plan, (performance.now() - started) / 1000);
-  else printPlan(plan, folder);
+  else if (format === "summary") printSummary(plan, (performance.now() - started) / 1000, gate);
+  else printPlan(plan, folder, gate);
 }
 
 async function confirm(question: string, yes: boolean): Promise<boolean> {
@@ -230,10 +239,18 @@ async function run(folder: string, yes: boolean, temporal: boolean): Promise<voi
   console.log("Changed your mind? `dz undo` puts everything back.");
 }
 
-async function undo(folder: string, yes: boolean, temporal: boolean): Promise<void> {
+async function undo(folder: string, yes: boolean, temporal: boolean, files: string[]): Promise<void> {
   const runId = await lastUndoableRun(folder);
   if (!runId) {
     console.log("Nothing to undo.");
+    return;
+  }
+  if (files.length > 0) {
+    const result = await undoFiles(folder, runId, files);
+    recordCounts("dz.undo_files", { restored: result.restored, failed: result.failed.length });
+    console.log(`Moved back ${result.restored} of ${files.length} files from run ${runId}. The review gate will learn from this.`);
+    for (const name of result.unmatched) console.log(`  not in this run: ${name}`);
+    printFailures(result.failed);
     return;
   }
   if (!(await confirm(`Undo run ${runId}?`, yes))) {
@@ -322,6 +339,7 @@ async function main(): Promise<void> {
       yes: { type: "boolean", short: "y" },
       temporal: { type: "boolean" },
       out: { type: "string" },
+      file: { type: "string", multiple: true },
     },
   });
   const [command, folderArg] = positionals;
@@ -336,7 +354,7 @@ async function main(): Promise<void> {
 
   if (command === "scan") return scan(folder, json);
   if (command === "run") return run(folder, values.yes ?? false, values.temporal ?? false);
-  if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false);
+  if (command === "undo") return undo(folder, values.yes ?? false, values.temporal ?? false, values.file ?? []);
   if (command === "worker") return startWorker();
   if (command === "receipts") return receipts(folder, values.out);
   if (command === "preview") return preview(folder, values.summary ? "summary" : json ? "json" : "table");

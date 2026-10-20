@@ -16,7 +16,8 @@
     "seed": "node --import tsx scripts/seed-demo.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "node --import tsx --test test/*.test.ts",
+    "seed:history": "node --import tsx scripts/seed-history.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

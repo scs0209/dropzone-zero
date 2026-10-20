@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { STATE_DIR } from "./plan.js";
 
 // An append-only JSON Lines log of every change Dropzone Zero makes to a folder.
+// It doubles as feedback: a "reject" line marks a single file the user moved back.
 // Each step is written before it happens ("started") and again after it is
 // verified ("done"), so an interrupted run can still be undone.
 
@@ -12,6 +13,7 @@ export type JournalEntry = { run: string; at: string } & (
   | { op: "move"; from: string; to: string; sha256: string; state: "started" | "done" | "failed"; error?: string }
   | { op: "run-end"; moved: number; failed: number }
   | { op: "undo-begin" }
+  | { op: "reject"; from: string }
   | { op: "restore"; from: string; to: string; state: "done" | "failed"; error?: string }
   | { op: "rmdir"; dir: string }
   | { op: "undo-end"; restored: number; failed: number }

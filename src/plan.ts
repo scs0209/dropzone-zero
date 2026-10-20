@@ -16,6 +16,8 @@ export interface PlanItem {
   name: string;
   /** Content hash at planning time; `dz run` refuses to move a file that changed since. */
   sha256: string;
+  size: number;
+  ageDays: number;
   action: Action;
   /** Null when a rule decided without asking the model. */
   category: Category | null;
@@ -56,6 +58,8 @@ export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions)
       plan.push({
         name: file.name,
         sha256: file.sha256,
+        size: file.size,
+        ageDays: file.ageDays,
         action: rule.action,
         category: null,
         target: rule.action === "quarantine" ? uniqueTarget(inbox, `${QUARANTINE_DIR}/${file.name}`, taken) : null,
@@ -65,7 +69,7 @@ export async function buildPlan(files: ScannedFile[], options: BuildPlanOptions)
       });
     } else {
       const result = await classify(file);
-      const base = { name: file.name, sha256: file.sha256, category: result.category, confidence: result.confidence, source: result.source };
+      const base = { name: file.name, sha256: file.sha256, size: file.size, ageDays: file.ageDays, category: result.category, confidence: result.confidence, source: result.source };
       if (result.source === "fallback" || result.confidence < MIN_CONFIDENCE) {
         const why = result.source === "fallback" ? result.reason : `Low confidence: ${result.reason}`;
         plan.push({ ...base, action: "skip", target: null, reason: why });

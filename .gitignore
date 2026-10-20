@@ -15,3 +15,7 @@ demo/
 
 # pnpm store created when the global one is not writable
 .pnpm-store/
+
+# Python environment for the local TabPFN review gate (ml/)
+ml/.venv/
+__pycache__/

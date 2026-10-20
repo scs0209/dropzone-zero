@@ -25,6 +25,8 @@ async function file(name: string, content: string): Promise<PlanItem> {
   return {
     name,
     sha256: await hashFile(join(inbox, name)),
+    size: content.length,
+    ageDays: 0,
     action: "move",
     category: "receipt",
     target: null,

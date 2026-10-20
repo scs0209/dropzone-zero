@@ -230,3 +230,26 @@ export async function undoRun(inbox: string, run: string): Promise<UndoResult> {
   await endUndo(inbox, run, result.restored, result.failed.length);
   return result;
 }
+
+/**
+ * Moves back only the named files from a run (by old name, new path, or new name)
+ * and records each as rejected, which the review gate learns from.
+ */
+export async function undoFiles(inbox: string, run: string, names: string[]): Promise<UndoResult & { unmatched: string[] }> {
+  const journal = new Journal(inbox, run);
+  const moves = await movesToUndo(inbox, run);
+  const result: UndoResult & { unmatched: string[] } = { run, restored: 0, failed: [], unmatched: [] };
+  for (const name of names) {
+    const move = moves.find((m) => m.from === name || m.to === name || m.to.split("/").pop() === name);
+    if (!move) {
+      result.unmatched.push(name);
+      continue;
+    }
+    await journal.write({ op: "reject", from: move.from });
+    const step = await restoreOne(inbox, run, move);
+    if (step.ok) result.restored++;
+    else result.failed.push({ name: step.name, error: step.error! });
+  }
+  await removeCreatedDirs(inbox, run);
+  return result;
+}
