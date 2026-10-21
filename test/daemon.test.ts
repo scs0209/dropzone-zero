@@ -116,7 +116,7 @@ describe("dz daemon API", () => {
 });
 
 describe("dz daemon remote approval", () => {
-  it("sends each question to the phone without file names, and acts on the answer from there", async (t) => {
+  it("sends each question to the phone without file names, acts on the answer from there, and says so", async (t) => {
     if (!listening) return t.skip("cannot bind a port here");
     const folder = await mkdtemp(join(tmpdir(), "dz-daemon-remote-"));
     const infoPath = join(await mkdtemp(join(tmpdir(), "dz-daemon-info-")), "daemon.json");
@@ -128,7 +128,9 @@ describe("dz daemon remote approval", () => {
         return new Promise<"approved">((resolve) => (approve = () => resolve("approved")));
       },
     };
-    const remote = new Daemon({ folder, model: "test", classify, port: 0, infoPath, settleMs: 0, debounceMs: 50, waitForModel: async () => {}, remoteApprover: phone });
+    const said: string[] = [];
+    const voice = { say: async (text: string) => void said.push(text) };
+    const remote = new Daemon({ folder, model: "test", classify, port: 0, infoPath, settleMs: 0, debounceMs: 50, waitForModel: async () => {}, remoteApprover: phone, voice });
     await remote.start();
     await remote.ready();
     try {
@@ -138,6 +140,8 @@ describe("dz daemon remote approval", () => {
       approve();
       await until(async () => existsSync(join(folder, "Installers/secret-plans.pkg")));
       assert.equal(remote.state().pending.length, 0);
+      await until(async () => said.length === 2);
+      assert.deepEqual(said, ["I need your OK on an installer.", "Filed an installer."]);
     } finally {
       await remote.stop();
     }

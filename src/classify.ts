@@ -114,6 +114,19 @@ const FOLDERS: Record<Category, { base: string; monthly: boolean }> = {
   other: { base: "Other", monthly: false },
 };
 
+/** The category whose folder a filed path is in, e.g. Finance/Receipts/2026-10/x.pdf -> receipt. */
+export function categoryOfTarget(target: string): Category | null {
+  let best: Category | null = null;
+  let length = 0;
+  for (const [category, { base }] of Object.entries(FOLDERS) as [Category, { base: string }][]) {
+    if ((target === base || target.startsWith(`${base}/`)) && base.length > length) {
+      best = category;
+      length = base.length;
+    }
+  }
+  return best;
+}
+
 export function buildPrompt(file: ScannedFile, content: ExtractedContent): string {
   const body = content.text
     ? `Content${content.truncated ? " (truncated)" : ""}:\n"""\n${content.text}\n"""`

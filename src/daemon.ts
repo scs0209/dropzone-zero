@@ -10,6 +10,7 @@ import { lastUndoableRun, undoRun } from "./execute.js";
 import { fingerprint } from "./guard.js";
 import { recentMoves, type RecentMove } from "./recent.js";
 import type { RemoteApprover } from "./remote-approval.js";
+import { spokenQuestion, spokenSummary, type Voice } from "./voice.js";
 import { startWatching, type CycleResult, type WatchControl, type WatchOptions } from "./watch.js";
 
 // `dz daemon`: the watcher plus a small local API, so a desktop UI (the Zee
@@ -63,6 +64,8 @@ export interface DaemonOptions extends Omit<WatchOptions, "auto" | "inbox"> {
   onEvent?: (result: CycleResult) => void;
   /** Also asks each question on the approver's phone (Auth0 CIBA); whichever answer comes first counts. */
   remoteApprover?: Pick<RemoteApprover, "ask"> | null;
+  /** Zee says what it filed and when it needs an OK (ElevenLabs); kinds and counts only. */
+  voice?: Pick<Voice, "say"> | null;
 }
 
 const DecideBody = z.object({ id: z.string().min(1), approve: z.boolean() });
@@ -185,6 +188,7 @@ export class Daemon {
       this.lastRun = { run: result.run.run, moved: result.run.moved };
       this.lastMessage = `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}.`;
     }
+    if (result.run?.moves.length) void this.options.voice?.say(spokenSummary(result.run.moves));
     // Every pass, not only after its own moves: the journal is the record, whoever wrote it.
     this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
     for (const item of result.needsDecision?.reviews ?? []) {
@@ -197,6 +201,10 @@ export class Daemon {
     if (batch) {
       this.pending.push({ kind: "batch", id: batch.key, title: `Move ${batch.count} new files at once`, detail: "More than the bulk limit arrived together." });
       this.askRemotely(batch.key, `Dropzone Zero: move ${batch.count} new files`);
+    }
+    const reviews = result.needsDecision?.reviews ?? [];
+    if (reviews.length || batch) {
+      void this.options.voice?.say(spokenQuestion(batch ? Array(batch.count).fill(null) : reviews.map((item) => item.category)));
     }
     this.options.onEvent?.(result);
   }

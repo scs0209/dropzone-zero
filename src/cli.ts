@@ -26,6 +26,7 @@ import { batchNeedsApproval, DEFAULT_BULK_LIMIT, fingerprint, isRunnable } from 
 import { acquireWatchLock, WatcherRunningError } from "./lock.js";
 import { notify } from "./notify.js";
 import { RemoteApprover, remoteApprovalFromEnv } from "./remote-approval.js";
+import { Voice, voiceFromEnv } from "./voice.js";
 import { describeMoves, recentMoves } from "./recent.js";
 import { newRunId } from "./journal.js";
 import { OllamaClient, OllamaUnavailableError } from "./ollama.js";
@@ -555,10 +556,12 @@ async function daemon(folder: string): Promise<void> {
   const client = new OllamaClient();
   const { Daemon } = await import("./daemon.js");
   const remote = remoteApprovalFromEnv();
+  const voiceConfig = voiceFromEnv();
   const instance = new Daemon({
     folder,
     model: client.model,
     remoteApprover: remote ? new RemoteApprover(remote) : null,
+    voice: voiceConfig ? new Voice(voiceConfig) : null,
     classify: async (file) => classifyFile(client, file, await extractContent(file)),
     waitForModel: () => waitForOllama(client),
     onEvent: (result) => {
@@ -569,6 +572,7 @@ async function daemon(folder: string): Promise<void> {
   });
   await instance.start();
   console.log(`Daemon watching ${folder}; the Zee app connects on 127.0.0.1. Press Ctrl+C to stop.`);
+  if (voiceConfig) console.log("Zee's voice is on (ElevenLabs): it says what it filed, by kind and count only.");
   if (remote) console.log("Remote approval is on: questions also go to the approver's phone (Auth0 Guardian).");
   await new Promise<void>((resolveStop) => {
     const stop = () =>
