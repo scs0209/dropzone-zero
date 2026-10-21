@@ -137,9 +137,9 @@ Here is the run as the terminal printed it: the untrained baseline, the three ep
 
 ![The Tinker run in a terminal: base sampling, three LoRA epochs with loss 0.2397, 0.0026, 0.0005, then the replay scoring at 100% and 100%](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/tinker-run.png)
 
-And the same two sessions on Tinker's dashboard: Qwen3.5-4B, about 268K tokens, and an estimated $0.16 of token spend for the whole experiment.
+Tinker's own dashboard shows the same run: one training run on Qwen3.5-4B with LoRA rank 16, and 24 training steps, which is 117 cases in batches of 16 (8 steps), three times over. The session cost an estimated $0.15, 95% of it training; sampling the untrained baseline in a second session added $0.01.
 
-![Tinker's dashboard: two sessions on Qwen/Qwen3.5-4B, 230.28K and 37.43K tokens, an estimated $0.15 and $0.01 of token spend](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/tinker-dashboard.png)
+![Tinker's session details: $0.15 estimated, 95.3% of it training, one training run on Qwen/Qwen3.5-4B with LoRA rank 16, and a training-steps chart that climbs to 24](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/tinker-session.png)
 
 ![Document type and date accuracy for gemma4:e4b, untrained Qwen3.5-4B, and Qwen3.5-4B after LoRA, on the same 63 synthetic test files](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/model-compare.png)
 
