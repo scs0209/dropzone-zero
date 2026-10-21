@@ -72,6 +72,15 @@ Everyone files differently. Rather than adding a setting for every habit, Dropzo
 
 An invoice in the right folder is still an invoice I forget to pay. So when Dropzone Zero files an invoice, a booking, or a warranty, it also writes a calendar event for what comes next: "Pay: Pixelwave hosting invoice" a day before it is due, the hotel booking on its date, "Warranty ends" a month before it does. The same rule as everywhere else applies: the due date is read from the text next to "Due date" or "Pay by" and kept only if it is really written there, because the date Gemma picks for an invoice is the day it was issued, not the day it is due. The events are plain `.ics` files that wait in `Calendar/Follow-ups`; Zee shows them under **Coming up**, and one click hands one to the Calendar app, which asks before adding it. On the demo folder, five documents in gave four follow-ups out; the receipt, rightly, asked nothing of me.
 
+Then I made adding an event as reversible as filing a file: once an event is in Calendar, Zee's button becomes **Remove from calendar**, and undoing a run takes back its events too. Making that true took more tries than anything else in the project, and every try was a lesson in what "undo" has to mean:
+
+- **The button that did nothing.** Zee's **Undo last** asked "Are you sure?" with `window.confirm()`. Zee's macOS webview doesn't show JavaScript dialogs at all, so `confirm()` quietly returned `false` and the undo never ran. It now asks inside the button itself: the first click turns it into "Put back?", the second does it.
+- **The undo that undid itself.** When undo did put a file back in Downloads, the watcher saw a "new" download and filed it again a few seconds later. So the watcher now remembers what an undo put back (by name and hash, from the journal) and leaves it alone.
+- **The fix that went too far.** That memory then ignored the same file when I deleted it and downloaded it again, and so did the older rule that leaves files alone if they were there when Zee started. Both now forget a file the moment it leaves the folder, so a real re-download is always new. I only found this by testing it by hand: copying over the old file changed nothing, and deleting it first did.
+- **The event Calendar renamed.** Remove looked the event up by the UID I wrote into the `.ics` file and found nothing (`removed: 0`). The Calendar app gives an imported event a UID of its own. What it does keep is the event's notes, so each event now carries "Dropzone Zero ID: …" there, and Remove deletes only events with that line. It asks macOS for permission to control Calendar once, and never looks at any other event.
+
+None of these showed up in the unit tests, which all passed every time. They showed up when I used the app, which is a good argument for using the app.
+
 ### Durable, watchable, and one click away
 
 - **[Temporal](https://temporal.io)** wraps `dz run` and `dz undo` as durable workflows. I killed a run after 15 of 30 files; `dz worker` finished it with 30 moved and 0 failed, and undo restored every file byte for byte.
