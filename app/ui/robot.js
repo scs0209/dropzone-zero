@@ -79,6 +79,91 @@ const shadow = mesh(new THREE.CircleGeometry(1.0, 48), new THREE.MeshBasicMateri
 shadow.rotation.x = -Math.PI / 2;
 scene.add(shadow);
 
+// The hole Zee dives into when it is hidden or quits, and pops out of when it comes
+// back. Anything below the ground is clipped while Zee goes through it, so Zee
+// sinks into the hole instead of showing through the floor around it.
+const holeMat = new THREE.MeshBasicMaterial({ color: 0x0b0f12 });
+const hole = new THREE.Group();
+const holeFloor = mesh(new THREE.CircleGeometry(1.15, 48), holeMat);
+const holeRim = mesh(new THREE.RingGeometry(1.15, 1.32, 48), new THREE.MeshBasicMaterial({ color: 0x4a5560 }), 0, 0, -0.001);
+hole.add(holeFloor, holeRim);
+hole.position.y = -0.6;
+hole.rotation.x = -Math.PI / 2;
+hole.scale.setScalar(0);
+hole.visible = false;
+scene.add(hole);
+renderer.localClippingEnabled = true;
+const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6); // far away: nothing clipped
+robot.traverse((node) => {
+  if (node.material) node.material.clippingPlanes = [ground];
+});
+
+/** A running dive or pop-out: owns Zee's position and turn until it ends. */
+let action = null;
+const ease = (x) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+const span = (t, from, to) => (t - from) / (to - from);
+
+function play(kind) {
+  return new Promise((resolve) => {
+    action = { kind, start: clock.getElapsedTime(), resolve };
+  });
+}
+
+/** One frame of the dive (seconds since it began); true when it is over. */
+function diveFrame(e) {
+  hole.visible = true;
+  shadow.visible = false;
+  ground.constant = 0.6;
+  // The hole opens, Zee crouches, hops, flips head first, and drops in; then the hole closes.
+  hole.scale.setScalar(e < 1.25 ? ease(span(e, 0, 0.3)) : 1 - ease(span(e, 1.25, 1.55)));
+  const crouch = e < 0.35 ? Math.sin(span(e, 0, 0.35) * Math.PI) : 0;
+  robot.scale.set(1 + crouch * 0.08, 1 - crouch * 0.15, 1 + crouch * 0.08);
+  if (e < 0.35) {
+    robot.position.y = -crouch * 0.08;
+    robot.rotation.x = 0;
+  } else {
+    const air = span(e, 0.35, 1.15); // 0 at take-off, 1 well inside the hole
+    // A small hop, then head first into the hole, tipping away from the viewer
+    // (tipping toward the camera filled the frame with Zee's back).
+    robot.position.y = 0.5 * Math.sin(Math.min(air, 0.5) * Math.PI) - (air > 0.5 ? 12 * Math.pow(air - 0.5, 2) : 0);
+    robot.rotation.x = -ease(air) * 0.8 * Math.PI;
+  }
+  robot.rotation.y *= 0.8;
+  return e > 1.6;
+}
+
+/** One frame of popping back out of the hole; true when Zee stands where it was. */
+function emergeFrame(e) {
+  robot.visible = true;
+  hole.visible = true;
+  shadow.visible = false;
+  ground.constant = 0.6;
+  hole.scale.setScalar(e < 0.75 ? ease(span(e, 0, 0.25)) : 1 - ease(span(e, 0.75, 1.05)));
+  const up = span(e, 0.2, 0.75);
+  // Comes up from below, overshoots a little, and settles.
+  robot.position.y = up <= 0 ? -3 : up < 1 ? -3 + 3.35 * ease(up) : 0.35 * Math.max(0, 1 - span(e, 0.75, 1.0)) * Math.cos(span(e, 0.75, 1.0) * Math.PI / 2);
+  robot.rotation.x = 0;
+  robot.scale.setScalar(1);
+  return e > 1.1;
+}
+
+function endAction() {
+  const { kind, resolve } = action;
+  action = null;
+  hole.visible = false;
+  hole.scale.setScalar(0);
+  ground.constant = 1e6;
+  shadow.visible = kind !== "dive";
+  robot.scale.setScalar(1);
+  robot.rotation.x = 0;
+  // After a dive Zee stays down there, out of sight, until it pops back out.
+  submerged = kind === "dive";
+  robot.position.y = submerged ? -3 : 0;
+  robot.visible = !submerged;
+  resolve();
+}
+let submerged = false;
+
 // Moods, as set by zee.js: sleeping, thinking, eating, asking, dizzy, paused.
 let mood = document.body.className || "sleeping";
 const pointer = { x: 0, y: 0 };
@@ -96,6 +181,14 @@ window.addEventListener("mousemove", (event) => {
 window.zeeRobot = {
   setMood(next) {
     mood = next;
+  },
+  /** Dives into a hole in the ground; resolves when Zee is gone. */
+  dive() {
+    return submerged ? Promise.resolve() : play("dive");
+  },
+  /** Pops back out of the hole; resolves when Zee stands where it was. */
+  emerge() {
+    return submerged ? play("emerge") : Promise.resolve();
   },
 };
 
@@ -115,12 +208,18 @@ function frame() {
   requestAnimationFrame(frame);
   const t = clock.getElapsedTime();
   // An always-on companion should be cheap: 30 fps when active, 12 when resting.
-  const fps = mood === "sleeping" || mood === "paused" ? 12 : 30;
+  // A dive or pop-out always runs at 60, or it looks choppy.
+  const fps = action ? 60 : mood === "sleeping" || mood === "paused" ? 12 : 30;
   if (t - last < 1 / fps) return;
   last = t;
 
   const resting = mood === "sleeping" || mood === "paused";
-  robot.position.y = mood === "paused" ? 0 : Math.sin(t * (resting ? 1.6 : 3)) * (resting ? 0.03 : 0.05);
+  if (action) {
+    const elapsed = t - action.start;
+    if ((action.kind === "dive" ? diveFrame : emergeFrame)(elapsed)) endAction();
+  } else if (!submerged) {
+    robot.position.y = mood === "paused" ? 0 : Math.sin(t * (resting ? 1.6 : 3)) * (resting ? 0.03 : 0.05);
+  }
 
   // Eating: face a little toward the upper right, where the page comes from, not the pointer.
   const eating = mood === "eating";
@@ -129,7 +228,7 @@ function frame() {
   head.rotation.y += (lookX - head.rotation.y) * 0.12;
   head.rotation.x += (lookY - head.rotation.x) * 0.12;
   head.rotation.z = mood === "dizzy" ? Math.sin(t * 4) * 0.18 : head.rotation.z * 0.8;
-  robot.rotation.y += ((resting ? Math.sin(t * 0.4) * 0.2 : eating ? 0.08 : pointer.x * 0.2) - robot.rotation.y) * 0.06;
+  if (!action) robot.rotation.y += ((resting ? Math.sin(t * 0.4) * 0.2 : eating ? 0.08 : pointer.x * 0.2) - robot.rotation.y) * 0.06;
 
   const blink = t % 3.4 < 0.12;
   const thinking = mood === "thinking";

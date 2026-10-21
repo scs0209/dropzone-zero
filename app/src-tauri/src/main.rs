@@ -13,7 +13,7 @@ use services::Services;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, RunEvent, State, Wry};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, Wry};
 
 const WIDTH: f64 = 300.0;
 const HEIGHT: f64 = 380.0;
@@ -100,18 +100,48 @@ fn set_attention(app: AppHandle, count: u32) {
     }
 }
 
+/// Quits once Zee has dived out of sight (the page calls this after the dive).
+#[tauri::command]
+fn quit_zee(app: AppHandle) {
+    app.exit(0);
+}
+
+/// Hiding asks the page first, so Zee can dive into its hole before the window goes;
+/// showing tells the page, so Zee pops back out.
 fn toggle(app: &AppHandle) {
     let visible = app
         .get_webview_window("zee")
         .and_then(|w| w.is_visible().ok())
         .unwrap_or(false);
-    set_zee_visible(app.clone(), !visible);
+    if visible {
+        let _ = app.emit("zee:hide-requested", ());
+    } else {
+        set_zee_visible(app.clone(), true);
+        let _ = app.emit("zee:shown", ());
+    }
+}
+
+/// Quitting lets Zee dive first, but never waits on the page for more than a few seconds.
+fn quit(app: &AppHandle) {
+    let visible = app
+        .get_webview_window("zee")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    if !visible || app.emit("zee:quit-requested", ()).is_err() {
+        app.exit(0);
+        return;
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(3));
+        app.exit(0);
+    });
 }
 
 fn main() {
     let app = tauri::Builder::default()
         .manage(Services::default())
-        .invoke_handler(tauri::generate_handler![daemon_info, start_services, fit_window, set_zee_visible, set_attention])
+        .invoke_handler(tauri::generate_handler![daemon_info, start_services, fit_window, set_zee_visible, set_attention, quit_zee])
         .setup(|app| {
             // Bring up what Zee needs without holding up the window.
             let handle = app.handle().clone();
@@ -139,7 +169,7 @@ fn main() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "toggle" => toggle(app),
-                    "quit" => app.exit(0),
+                    "quit" => quit(app),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {

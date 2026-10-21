@@ -386,9 +386,27 @@ $("start").addEventListener("click", async () => {
   }
 });
 
-$("hide").addEventListener("click", () => {
+// Going away: the bubble closes, Zee dives into a hole in the ground, then the
+// window hides (or the app quits). Coming back, Zee pops out of the hole.
+async function diveAway() {
   setBubbleOpen(false);
+  await window.zeeRobot?.dive();
+}
+
+async function hideZee() {
+  await diveAway();
   window.__TAURI__?.core.invoke("set_zee_visible", { visible: false }).catch(showError);
+}
+
+$("hide").addEventListener("click", hideZee);
+
+// The menu bar icon and its menu ask the page first, so Zee can dive before the window goes.
+const tauriEvents = window.__TAURI__?.event;
+tauriEvents?.listen("zee:hide-requested", hideZee);
+tauriEvents?.listen("zee:shown", () => window.zeeRobot?.emerge());
+tauriEvents?.listen("zee:quit-requested", async () => {
+  await diveAway();
+  window.__TAURI__.core.invoke("quit_zee");
 });
 
 // Undo asks first, inside the bubble: the first click turns the button into
