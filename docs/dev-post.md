@@ -137,6 +137,10 @@ Here is the run as the terminal printed it: the untrained baseline, the three ep
 
 ![The Tinker run in a terminal: base sampling, three LoRA epochs with loss 0.2397, 0.0026, 0.0005, then the replay scoring at 100% and 100%](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/tinker-run.png)
 
+And the same two sessions on Tinker's dashboard: Qwen3.5-4B, about 268K tokens, and an estimated $0.16 of token spend for the whole experiment.
+
+![Tinker's dashboard: two sessions on Qwen/Qwen3.5-4B, 230.28K and 37.43K tokens, an estimated $0.15 and $0.01 of token spend](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/tinker-dashboard.png)
+
 ![Document type and date accuracy for gemma4:e4b, untrained Qwen3.5-4B, and Qwen3.5-4B after LoRA, on the same 63 synthetic test files](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/model-compare.png)
 
 [agent_session 삽입: Tinker 파인튜닝 세션 — Qwen3.5-4B 기준선 샘플링 → LoRA 학습 로그(epoch별 loss 0.2397 → 0.0026 → 0.0005) → `dz eval --provider replay`로 채점한 결과까지의 실행 기록]
