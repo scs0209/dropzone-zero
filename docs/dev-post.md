@@ -166,7 +166,7 @@ Below is one preview of the 31 demo files: 25 model calls (rules decided the oth
 
 ## My Agent Session
 
-I built Dropzone Zero with Claude Code. The two sessions marked above, the undo bug chase and the Tinker fine-tune, show what the code alone can't: how each problem was found.
+I built Dropzone Zero with Claude Code, and [Entire](https://entire.io) recorded the sessions as checkpoints while I worked. The two sessions marked above, the undo bug chase and the Tinker fine-tune, show what the code alone can't: how each problem was found.
 
 ## The Lazy Payoff
 
@@ -185,5 +185,6 @@ Being lazy is safe here. If Gemma gets one wrong, undo is one click, and the fil
 - **Best Use of Temporal**: durable `dz run` and `dz undo`. A run killed after 15 of 30 files was finished by `dz worker`: 30 moved, 0 failed.
 - **Best Use of Mastra**: `dz tidy` as a workflow that suspends for each review item and resumes on my answer.
 - **Best Use of Sentry Agent Tracing**: a `gen_ai.chat` span per model call with tokens and latency, and nothing private in it.
+- **Best Use of Entire**: Entire recorded the Claude Code sessions I built this with, as checkpoints pushed to a separate repo, so the undo bug chase and the Tinker run above can be traced back to the conversations that produced them.
 
-Tried but not entered: Backboard (its free credit covered memory and RAG but not model calls, so the comparison moved to Tinker), ElevenLabs (a voice for Zee is coded but hasn't been run with a real key), and Entire (it recorded the sessions while I built this; recording is now off, and the sessions above are shared through DevRelay instead).
+Tried but not entered: Backboard (its free credit covered memory and RAG but not model calls, so the comparison moved to Tinker) and ElevenLabs (a voice for Zee is coded but hasn't been run with a real key).
