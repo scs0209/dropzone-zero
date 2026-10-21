@@ -4,8 +4,12 @@
 // DevTools protocol, and ffmpeg encodes the GIF. Nothing touches ~/Downloads or the
 // daemon Zee.app runs: this daemon uses a free port and a temporary info file.
 //
+// `dive` records docs/media/zee-dive.gif instead: Zee diving into its hole, as when it
+// is hidden or quits, and popping back out, as when it is shown again.
+//
 // Needs Ollama with gemma4:e4b, Google Chrome, ffmpeg, and `pnpm seed` first.
 //   pnpm media:zee
+//   pnpm media:zee dive
 
 import { execFile, spawn } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
@@ -22,11 +26,15 @@ const repo = resolve(import.meta.dirname, "..");
 const seedInbox = join(repo, "demo", "inbox");
 const folder = join(repo, "demo", "zee", "Downloads");
 const framesDir = join(repo, "demo", "zee", "frames");
-const output = join(repo, "docs", "media", "zee.gif");
+const scene = process.argv[2] === "dive" ? "dive" : "filing";
+const output = join(repo, "docs", "media", scene === "dive" ? "zee-dive.gif" : "zee.gif");
+// The filing scene has long waits for the model, so it plays faster; the dive plays as it runs.
+const speed = scene === "dive" ? 1 : 1.5;
 const chromePath = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const UI_PORT = 1420;
 const DEBUG_PORT = 9333;
-const VIEW = { width: 340, height: 400 };
+// With its bubble closed, Zee's window is about the size of Zee; the dive is filmed that way.
+const VIEW = scene === "dive" ? { width: 150, height: 160 } : { width: 340, height: 400 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // --- a synthetic Downloads folder and a real daemon watching it -------------------
@@ -120,7 +128,8 @@ await new Promise((ok) => socket.addEventListener("open", ok, { once: true }));
 let nextId = 0;
 const waiting = new Map<number, { ok: (result: unknown) => void; fail: (error: Error) => void }>();
 socket.addEventListener("message", (event) => {
-  const message = JSON.parse(String(event.data)) as { id?: number; result?: unknown; error?: { message: string } };
+  const message = JSON.parse(String(event.data)) as { id?: number; method?: string; params?: unknown; result?: unknown; error?: { message: string } };
+  if (message.method === "Page.screencastFrame") return void onFrame(message.params as ScreencastFrame);
   if (message.id === undefined) return;
   const call = waiting.get(message.id);
   waiting.delete(message.id);
@@ -150,6 +159,14 @@ function send<T>(method: string, params: object): Promise<T> {
 }
 const run = (expression: string) => cdp("Runtime.evaluate", { expression, awaitPromise: true });
 
+type ScreencastFrame = { data: string; sessionId: number; metadata: { timestamp: number } };
+function onFrame(frame: ScreencastFrame): void {
+  const file = join(framesDir, `f${String(frames.length).padStart(5, "0")}.png`);
+  frames.push({ file, at: frame.metadata.timestamp * 1000 });
+  writes.push(writeFile(file, Buffer.from(frame.data, "base64")));
+  void send("Page.screencastFrameAck", { sessionId: frame.sessionId }).catch(() => {});
+}
+
 await cdp("Emulation.setDeviceMetricsOverride", { ...VIEW, deviceScaleFactor: 2, mobile: false });
 await cdp("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "light" }] });
 await cdp("Page.enable");
@@ -159,23 +176,13 @@ await sleep(1_500);
 await run(`document.documentElement.style.background = "linear-gradient(160deg, #e9edf0, #cfd8de)"`);
 
 // --- capture frames while the scene plays ---------------------------------------
+// A screencast sends a frame every time the page repaints, so a quick animation
+// such as the dive is not reduced to a handful of screenshots.
 const frames: { file: string; at: number }[] = [];
+const writes: Promise<void>[] = [];
 const started = Date.now();
 const log = (step: string) => console.log(`${((Date.now() - started) / 1000).toFixed(1)}s ${step} (${frames.length} frames)`);
-let capturing = true;
-const capture = (async () => {
-  while (capturing) {
-    try {
-      const { data } = await cdp<{ data: string }>("Page.captureScreenshot", { format: "png" });
-      const file = join(framesDir, `f${String(frames.length).padStart(5, "0")}.png`);
-      await writeFile(file, Buffer.from(data, "base64"));
-      frames.push({ file, at: Date.now() });
-    } catch (error) {
-      console.error(`Skipped a frame: ${(error as Error).message}`);
-    }
-    await sleep(60);
-  }
-})();
+await cdp("Page.startScreencast", { format: "png", everyNthFrame: 1, maxWidth: VIEW.width * 2, maxHeight: VIEW.height * 2 });
 
 const click = (selector: string) => run(`document.querySelector(${JSON.stringify(selector)})?.click()`);
 const clickText = (text: string) =>
@@ -183,40 +190,51 @@ const clickText = (text: string) =>
 
 try {
   await waitFor((s) => s.mood === "sleeping");
-  await sleep(1_000);
-  await click("#zee"); // open the bubble, so what Zee says can be read throughout
-  await sleep(2_000);
+  if (scene === "dive") {
+    await sleep(1_500);
+    // The same calls the hide button and the menu bar icon make, minus hiding the window.
+    log("dive");
+    await run("window.zeeRobot.dive()");
+    await sleep(1_200);
+    log("emerge");
+    await run("window.zeeRobot.emerge()");
+    await sleep(800);
+  } else {
+    await sleep(1_000);
+    await click("#zee"); // open the bubble, so what Zee says can be read throughout
+    await sleep(2_000);
 
-  // 1. A receipt arrives: Zee reads it, eats it, files it.
-  log("receipt arrives");
-  await download("receipt_8d72f1.pdf");
-  // "Eating" lasts a moment, so wait for the result rather than the mood.
-  await waitFor((s) => s.recent.length > 0);
-  await sleep(3_500);
+    // 1. A receipt arrives: Zee reads it, eats it, files it.
+    log("receipt arrives");
+    await download("receipt_8d72f1.pdf");
+    // "Eating" lasts a moment, so wait for the result rather than the mood.
+    await waitFor((s) => s.recent.length > 0);
+    await sleep(3_500);
 
-  // 2. An installer arrives: the guard holds it and Zee asks, in the same bubble.
-  log("installer arrives");
-  await download("Notely-4.2.1.dmg");
-  await waitFor((s) => s.mood === "asking", 60_000);
-  log("asking");
-  await sleep(3_000);
-  log("leave it");
-  await clickText("Leave it");
-  await sleep(2_500);
+    // 2. An installer arrives: the guard holds it and Zee asks, in the same bubble.
+    log("installer arrives");
+    await download("Notely-4.2.1.dmg");
+    await waitFor((s) => s.mood === "asking", 60_000);
+    log("asking");
+    await sleep(3_000);
+    log("leave it");
+    await clickText("Leave it");
+    await sleep(2_500);
 
-  // 3. Changed your mind about the receipt? Undo asks once in the bubble, then puts it back.
-  log("undo");
-  await click("#undo");
-  await sleep(1_500);
-  await click("#undo");
-  await waitFor((s) => s.message.startsWith("Put back"), 15_000);
-  log("put back");
-  await sleep(3_000);
+    // 3. Changed your mind about the receipt? Undo asks once in the bubble, then puts it back.
+    log("undo");
+    await click("#undo");
+    await sleep(1_500);
+    await click("#undo");
+    await waitFor((s) => s.message.startsWith("Put back"), 15_000);
+    log("put back");
+    await sleep(3_000);
+  }
 } catch (error) {
   console.error(`Scene stopped early: ${(error as Error).message}`);
 } finally {
-  capturing = false;
-  await capture;
+  await send("Page.stopScreencast", {}).catch(() => {});
+  await Promise.all(writes);
   socket.close();
   chrome.kill();
   await new Promise((ok) => (chrome.exitCode !== null ? ok(null) : chrome.once("exit", ok)));
@@ -226,14 +244,16 @@ try {
   await rm(profile, { recursive: true, force: true }).catch(() => {}); // Chrome may still be flushing its cache
 }
 
-// --- encode: real frame timings, 1.5x speed, palette per GIF --------------------
-const list = frames
-  .map((f, i) => `file '${f.file}'\nduration ${(((frames[i + 1]?.at ?? f.at + 100) - f.at) / 1000 / 1.5).toFixed(3)}`)
+// --- encode: real frame timings (the last frame holds), sped up for the filing scene ----
+// The screencast's first frames can still show the blank page from before the backdrop was set.
+const shown = frames.filter((f) => f.at >= frames[0]!.at + 400);
+const list = shown
+  .map((f, i) => `file '${f.file}'\nduration ${(((shown[i + 1]?.at ?? f.at + 1500) - f.at) / 1000 / speed).toFixed(3)}`)
   .join("\n");
-await writeFile(join(framesDir, "list.txt"), list + `\nfile '${frames.at(-1)!.file}'\n`);
+await writeFile(join(framesDir, "list.txt"), list + `\nfile '${shown.at(-1)!.file}'\n`);
 await promisify(execFile)("ffmpeg", [
   "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", join(framesDir, "list.txt"),
-  "-vf", "fps=15,scale=480:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4",
+  "-vf", `fps=${scene === "dive" ? 24 : 15},scale=${scene === "dive" ? VIEW.width * 2 : 480}:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4`,
   output,
 ]);
 console.log(`Wrote ${output} from ${frames.length} frames.`);

@@ -86,6 +86,10 @@ The harness is the code that touches the disk, and it trusts nothing before it, 
 
 The first working version was a CLI, and daily use showed the problem: open a terminal, remember `dz watch ~/Downloads --auto`, and once files moved on their own, no idea where they went. A tool for being lazy shouldn't need a terminal. So it all became one click on **Zee**, a robot built from [three.js](https://threejs.org) shapes: its face shows what it's doing, its bubble lists what was filed (click to see it in Finder), questions come with **Move it** and **Leave it**, and **Undo last** is always there. Zee is also the only thing I launch; it starts Ollama and the background daemon, and stops them when I quit.
 
+Hiding or quitting Zee doesn't just close a window. Zee dives into a hole in the ground, and pops back out when it's called:
+
+![Zee diving into a hole in the ground and popping back out](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/zee-dive.gif)
+
 I built Zee with [Tauri](https://tauri.app) rather than Electron. Zee is a window that never closes, so it has to be light: Electron ships Chromium and Node.js inside every app, while Tauri uses the WebView macOS already has, so Zee.app is 10 MB. Tauri is also locked down by default, which suits a UI that must never touch files: Zee's page can call only the window functions its capability file lists and a few commands of its own, and it talks to the daemon on `127.0.0.1` with a token only my user can read. A transparent, always-on-top window with a menu bar icon comes built in. The system WebView had a cost I found later, below.
 
 ### What daily use broke
@@ -128,6 +132,10 @@ Fine-tuning fixed every date the base model missed (on bank statements it picked
 So the app keeps Gemma, untuned. The task isn't hard enough to need more: reading one document and naming its kind and date is short, well-defined work, which is also why turning thinking off changed no answers. A tuned remote model would buy a point or two at the cost of leaving my laptop. The honest finding is about my test set: when three models land between 98% and 100%, it's too easy to tell them apart.
 
 A word on Tinker, because it surprised me. Fine-tuning had always sounded like a project of its own: rent GPUs, set up a training stack, babysit a run. Here the whole experiment is one 108-line Python script: create a LoRA training client, call `forward_backward` and `optim_step` per batch, save the weights, sample from the tuned model. I never touched a GPU. Writing the evaluation took longer than writing the training.
+
+Here is the run as the terminal printed it: the untrained baseline, the three epochs, and the replies scored by the app's own pipeline.
+
+![The Tinker run in a terminal: base sampling, three LoRA epochs with loss 0.2397, 0.0026, 0.0005, then the replay scoring at 100% and 100%](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/tinker-run.png)
 
 ![Document type and date accuracy for gemma4:e4b, untrained Qwen3.5-4B, and Qwen3.5-4B after LoRA, on the same 63 synthetic test files](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/model-compare.png)
 

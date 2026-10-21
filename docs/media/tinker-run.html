@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  The Tinker run in the DEV post (1040x450): the two finetune.py commands, then the
+  replay scoring from the repository root, with their output as the run printed it
+  on 2026-10-20 (the .env loading in front of the commands is left out).
+  Rebuild with: pnpm media:chart
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tinker run</title>
+    <style>
+      * { margin: 0; box-sizing: border-box; }
+      html, body { width: 1040px; height: 450px; overflow: hidden; background: #15191c; }
+      .window { margin: 22px; height: 406px; border-radius: 10px; background: #1d2226; box-shadow: 0 0 0 1px #2a3034; overflow: hidden; }
+      .bar { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: #252b2f; }
+      .bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); }
+      .bar span { margin-left: auto; margin-right: auto; color: #8d969a; font: 12px -apple-system, "Helvetica Neue", Arial, sans-serif; }
+      pre { padding: 14px 18px; font: 13px/1.6 "SF Mono", Menlo, Consolas, monospace; color: #d9d3ca; white-space: pre; }
+      .p { color: #5dcaa5; }
+      .c { color: #f1ebe2; font-weight: 600; }
+      .k { color: #c79a45; font-weight: 600; }
+      .d { color: #7f888c; }
+    </style>
+  </head>
+  <body>
+    <div class="window">
+      <div class="bar"><i style="--c: #ff5f57"></i><i style="--c: #febc2e"></i><i style="--c: #28c840"></i><span>dropzone-zero/ml</span></div>
+<pre><span class="p">ml $</span> <span class="c">uv run python finetune.py data/sft.jsonl --no-train --out ../eval/replies/qwen3.5-4b-base.jsonl</span>
+Qwen/Qwen3.5-4B: wrote 63 replies to ../eval/replies/qwen3.5-4b-base.jsonl
+<span class="p">ml $</span> <span class="c">uv run python finetune.py data/sft.jsonl --out ../eval/replies/qwen3.5-4b-lora.jsonl</span>
+epoch 1: loss <span class="k">0.2397</span>
+epoch 2: loss <span class="k">0.0026</span>
+epoch 3: loss <span class="k">0.0005</span>
+Qwen/Qwen3.5-4B + LoRA r16, 3 epochs on 117 synthetic cases: wrote 63 replies to ../eval/replies/qwen3.5-4b-lora.jsonl
+
+<span class="p">dropzone-zero $</span> <span class="c">pnpm dz eval --provider replay --replies eval/replies/qwen3.5-4b-lora.jsonl</span>
+tinker:qwen3.5-4b-lora on 63 test cases
+  Category accuracy  <span class="k">100.0%</span>
+  Date accuracy      <span class="k">100.0%</span>
+  Invalid output     0.0%
+  Latency            p50 7783 ms, p95 15752 ms
+<span class="d">Saved eval/results/tinker_qwen3.5-4b-lora-test.json</span></pre>
+    </div>
+  </body>
+</html>
