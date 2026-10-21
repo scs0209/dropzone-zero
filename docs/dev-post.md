@@ -93,9 +93,20 @@ Fine-tuning fixed every date the base model missed (on bank statements it picked
 
 ### Approving from my phone, without opening a door to my Mac
 
-The guard's questions used to wait for me at my desk. Now they also come to my phone. With [Auth0](https://auth0.com)'s Client-Initiated Backchannel Authentication (CIBA), the daemon asks Auth0 to send a Guardian push to me, then polls until I answer. I tap **Allow** on the bus, and the installer is filed before I get home; I tap **Deny**, and it stays in Downloads. Whichever answer comes first, Zee's bubble or the phone, decides, and the other question closes.
+The guard's questions used to wait for me at my desk. Now they also come to my phone. With [Auth0](https://auth0.com)'s Client-Initiated Backchannel Authentication (CIBA), the daemon asks Auth0 to send a Guardian push to me, then polls until I answer. If I'm out, I tap **Allow** and the installer is filed before I'm back; I tap **Deny** and it stays in Downloads. Whichever answer comes first, Zee's bubble or the phone, decides, and the other question closes.
+
+It stays quiet most of the time, which is the point. An ordinary download, a photo, a screenshot, a PDF receipt, is filed without asking, and I only see a notification on the Mac. My phone buzzes only when Zee would have asked anyway: an installer, a file Gemma isn't sure about (confidence below 0.5), a move the review gate expects me to undo, or more than 20 new files at once.
 
 Two things made this fit the rest of the project. The push carries only the kind of move, "Dropzone Zero: move 1 installer", never a file name, because the file name is exactly the private part. And nothing has to reach my Mac: the daemon only makes outgoing requests, its API still listens on 127.0.0.1 alone, and an approval releases the same single, fingerprint-bound move that **Move it** does in Zee, through the same guard. If I ignore the push, nothing happens; Zee simply keeps asking.
+
+Getting there took four small walls, each with a clear error message, which is how I like my walls:
+
+1. **"Application must have at least one channel configured."** A CIBA application needs a notification channel. The Auth0 MCP server created and inspected the app for me, but it can't set that field yet, so I turned on the CIBA grant and the Guardian push channel in the dashboard, then trimmed the app back to the CIBA grant only through the MCP.
+2. **"Push notifications not enabled on tenant."** The channel on the app isn't enough; Guardian push has to be on for the whole tenant (Security > Multi-factor Auth).
+3. **"User does not have push notifications set up."** The approver has to be enrolled in Guardian. My app has no sign-in screen, so I made MFA required for a moment, signed in once through the database connection's **Try** button, scanned the QR code with Guardian, and set the policy back. The enrollment stays.
+4. **A decline and a timeout look the same.** Auth0 answers `access_denied` for both. Treating a timeout as **Leave it** would quietly drop the question, so an `access_denied` that arrives near the deadline counts as unanswered, and Zee keeps asking.
+
+Then it worked: a test push came back `approved`, and a daemon watching a synthetic folder moved a held installer 13 seconds after I approved it on the phone.
 
 ### Seeing what the agent does
 
