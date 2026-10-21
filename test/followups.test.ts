@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { undoFiles, undoRun } from "../src/execute.js";
-import { addedToCalendar, firstDate, pendingFollowUps, recordDismissed, followUpFor, labeledDate, recordCalendarAdd, removeFromCalendar, subjectOf, takeBackFromCalendar, toIcs, writeFollowUps } from "../src/followups.js";
+import { addedToCalendar, firstDate, markersFor, pendingFollowUps, recordDismissed, followUpFor, labeledDate, recordCalendarAdd, removeFromCalendar, subjectOf, takeBackFromCalendar, toIcs, writeFollowUps } from "../src/followups.js";
 import { Journal } from "../src/journal.js";
 
 const TODAY = new Date("2026-10-21T00:00:00Z");
@@ -109,7 +109,9 @@ describe("calendar follow-ups", () => {
     await writeFile(join(inbox, to), "Due date 2026-10-31");
     const [followUp] = await writeFollowUps(inbox, [{ from: "i.txt", to }], [{ name: "i.txt", category: "invoice" }], TODAY, "run-1");
     assert.match(followUp!.uid, /^[0-9a-f]{24}@dropzone-zero$/);
-    assert.match(await readFile(join(inbox, followUp!.file), "utf8"), new RegExp(`UID:${followUp!.uid}`));
+    const ics = await readFile(join(inbox, followUp!.file), "utf8");
+    assert.match(ics, new RegExp(`UID:${followUp!.uid}`));
+    assert.ok(ics.includes(`Dropzone Zero ID: ${followUp!.uid}`), "the notes carry our ID, which Calendar keeps");
 
     assert.deepEqual(await addedToCalendar(inbox, "run-1"), [], "nothing added until the person clicks");
     await recordCalendarAdd(inbox, followUp!);
@@ -117,9 +119,9 @@ describe("calendar follow-ups", () => {
     assert.deepEqual(await addedToCalendar(inbox, "run-2"), []);
 
     const asked: string[][] = [];
-    const removed = await takeBackFromCalendar(inbox, [followUp!.uid], async (uids) => (asked.push(uids), uids.length));
+    const removed = await takeBackFromCalendar(inbox, [followUp!.uid], async (markers) => (asked.push(markers), 1));
     assert.equal(removed, 1);
-    assert.deepEqual(asked, [[followUp!.uid]]);
+    assert.deepEqual(asked, [[`Dropzone Zero ID: ${followUp!.uid}`, `Filed by Dropzone Zero as ${to}`]]);
     assert.deepEqual(await addedToCalendar(inbox, "run-1"), [], "taken back once");
 
     // What Zee lists after a restart comes from the journal.
@@ -132,6 +134,7 @@ describe("calendar follow-ups", () => {
   });
 
   it("never asks Calendar about an event it did not make", async () => {
-    assert.equal(await removeFromCalendar(["someone-elses-event", 'x" & do shell script "rm -rf ~', ""]), 0);
+    assert.equal(await removeFromCalendar(["someone-elses-event", 'x" & do shell script "rm -rf ~', "", "Filed by Dropzone Zero as "]), 0);
+    assert.deepEqual(markersFor("not-ours", "a.pdf"), []);
   });
 });

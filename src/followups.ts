@@ -124,7 +124,9 @@ export function toIcs(event: Omit<FollowUp, "file">, category: Category, now = n
     `DTSTART;VALUE=DATE:${day}`,
     `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, "")}`,
     `SUMMARY:${icsText(event.title)}`,
-    `DESCRIPTION:${icsText(`Filed by Dropzone Zero as ${event.from}`)}`,
+    // Calendar gives an imported event its own UID, so the notes carry ours: that is how
+    // "Remove from calendar" finds this event again, and only this one.
+    `DESCRIPTION:${icsText(`Filed by Dropzone Zero as ${event.from}\nDropzone Zero ID: ${event.uid}`)}`,
     "BEGIN:VALARM",
     "ACTION:DISPLAY",
     `DESCRIPTION:${icsText(event.title)}`,
@@ -182,24 +184,34 @@ export async function writeFollowUps(
   return written;
 }
 
-// Taking events back out of Calendar. Only events whose UID Dropzone Zero made
-// (…@dropzone-zero) are ever looked up, and only after the person added one from Zee.
-// The first time, macOS asks whether Zee may control Calendar.
+// Taking events back out of Calendar. The Calendar app gives an imported event a
+// UID of its own, so Dropzone Zero finds its events by what it wrote in their notes:
+// "Dropzone Zero ID: …@dropzone-zero", or for older ones "Filed by Dropzone Zero as
+// <file>". Only events sent from Zee are looked up. The first time, macOS asks
+// whether Zee may control Calendar.
 
 const OUR_UID = /^[0-9a-f]{24}@dropzone-zero$/;
+const FILED_BY = "Filed by Dropzone Zero as ";
 
-export type RemoveEvents = (uids: string[]) => Promise<number>;
+/** Finds events whose notes contain any marker and deletes them; returns how many went. */
+export type RemoveEvents = (markers: string[]) => Promise<number>;
 
-/** Deletes the events with these UIDs from every calendar; returns how many went. */
-export const removeFromCalendar: RemoveEvents = async (uids) => {
-  const ours = uids.filter((uid) => OUR_UID.test(uid));
+/** The note texts that identify one of our events. */
+export function markersFor(uid: string, from?: string): string[] {
+  if (!OUR_UID.test(uid)) return [];
+  return [`Dropzone Zero ID: ${uid}`, ...(from ? [`${FILED_BY}${from}`] : [])];
+}
+
+const appleScriptString = (text: string) => `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+
+export const removeFromCalendar: RemoveEvents = async (markers) => {
+  const ours = markers.filter((m) => /^Dropzone Zero ID: [0-9a-f]{24}@dropzone-zero$/.test(m) || (m.startsWith(FILED_BY) && m.length > FILED_BY.length && !/[\r\n]/.test(m)));
   if (ours.length === 0) return 0;
-  const list = ours.map((uid) => `"${uid}"`).join(", ");
   const script = `tell application "Calendar"
   set removed to 0
-  repeat with wanted in {${list}}
+  repeat with wanted in {${ours.map(appleScriptString).join(", ")}}
     repeat with cal in calendars
-      set hits to (every event of cal whose uid is (wanted as text))
+      set hits to (every event of cal whose description contains (wanted as text))
       repeat with hit in hits
         delete hit
         set removed to removed + 1
@@ -209,7 +221,7 @@ export const removeFromCalendar: RemoveEvents = async (uids) => {
   return removed
 end tell`;
   const output = await new Promise<string>((resolve, reject) =>
-    execFile("osascript", ["-e", script], { timeout: 30_000 }, (error, stdout) => (error ? reject(error) : resolve(stdout))),
+    execFile("osascript", ["-e", script], { timeout: 60_000 }, (error, stdout) => (error ? reject(error) : resolve(stdout))),
   );
   return Number(output.trim()) || 0;
 };
@@ -234,8 +246,10 @@ export async function addedToCalendar(inbox: string, run?: string): Promise<stri
 /** Takes these events back out of Calendar and journals it. */
 export async function takeBackFromCalendar(inbox: string, uids: string[], remove: RemoveEvents = removeFromCalendar): Promise<number> {
   if (uids.length === 0) return 0;
-  const removed = await remove(uids);
-  const runs = new Map((await readJournal(inbox)).flatMap((e) => (e.op === "calendar-add" ? [[e.uid, e.run] as const] : [])));
+  const entries = await readJournal(inbox);
+  const filed = new Map(entries.flatMap((e) => (e.op === "followup" && e.uid ? [[e.uid, e.from] as const] : [])));
+  const removed = await remove(uids.flatMap((uid) => markersFor(uid, filed.get(uid))));
+  const runs = new Map(entries.flatMap((e) => (e.op === "calendar-add" ? [[e.uid, e.run] as const] : [])));
   for (const uid of uids) await new Journal(inbox, runs.get(uid) ?? "calendar").write({ op: "calendar-remove", uid, removed });
   return removed;
 }
