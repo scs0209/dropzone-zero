@@ -28,7 +28,8 @@ the post draft `docs/dev-post.md`, cover and both GIFs in `docs/media/`, and Zee
 longer shakes while its bubble is resized (checked in the app). Auth0 remote approval
 (CIBA + Guardian push) works end to end: a real push approved on the phone moved a held
 installer in 13 s. The Auth0 app is "Dropzone Zero approvals" (CIBA grant only); the
-`AUTH0_*` keys live in `.env` on the first Mac only.
+`AUTH0_*` keys live in `.env` on the first Mac only. Calendar follow-ups (`.ics` for
+invoices, bookings, warranties; "Coming up" in Zee) work on the demo folder.
 Backboard and Render were dropped.
 
 ## Open
@@ -38,7 +39,9 @@ Backboard and Render were dropped.
 - **Numbers to reconcile:** the README says 75% of a real folder went to "other"
   before the new categories; the work notes say 39 of 55 files (about 71%).
   The post uses 39/55 -> 8/55.
-- Not done: ElevenLabs, .ics follow-up, .tech domain.
+- **ElevenLabs voice:** code and tests are in (`DZ_VOICE=on` + `ELEVENLABS_API_KEY`), but it
+  has not been tried with a real key, and the post does not mention it yet.
+- Not done: .tech domain.
 
 ## Conventions
 

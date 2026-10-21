@@ -102,6 +102,12 @@ describe("dz daemon API", () => {
     await until(async () => existsSync(join(inbox, "Installers/setup.pkg")));
   });
 
+  it("opens only calendar follow-ups it wrote itself", async (t) => {
+    if (!listening) return t.skip("cannot bind a port here");
+    assert.equal((await call("POST", "/calendar", { file: "../../etc/passwd" })).status, 404);
+    assert.deepEqual((await call("GET", "/state")).body.followUps, []);
+  });
+
   it("only reveals files it moved itself", async (t) => {
     if (!listening) return t.skip("cannot bind a port here");
     assert.equal((await call("POST", "/reveal", { to: "../../etc/passwd" })).status, 404);

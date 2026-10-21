@@ -9,6 +9,7 @@ import { z } from "zod";
 import { lastUndoableRun, undoRun } from "./execute.js";
 import { fingerprint } from "./guard.js";
 import { recentMoves, type RecentMove } from "./recent.js";
+import type { FollowUp } from "./followups.js";
 import type { RemoteApprover } from "./remote-approval.js";
 import { spokenQuestion, spokenSummary, type Voice } from "./voice.js";
 import { startWatching, type CycleResult, type WatchControl, type WatchOptions } from "./watch.js";
@@ -50,6 +51,8 @@ export interface DaemonState {
   pending: PendingDecision[];
   recent: RecentMove[];
   lastRun: { run: string; moved: number } | null;
+  /** Calendar follow-ups for what was filed, not yet added to a calendar. */
+  followUps: FollowUp[];
 }
 
 export interface DaemonOptions extends Omit<WatchOptions, "auto" | "inbox"> {
@@ -70,6 +73,7 @@ export interface DaemonOptions extends Omit<WatchOptions, "auto" | "inbox"> {
 
 const DecideBody = z.object({ id: z.string().min(1), approve: z.boolean() });
 const RevealBody = z.object({ to: z.string().min(1) });
+const CalendarBody = z.object({ file: z.string().min(1) });
 
 // The Tauri webview's origins (macOS and Windows/Linux) and its dev server.
 const ALLOWED_ORIGINS = new Set(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:1420"]);
@@ -89,6 +93,7 @@ export class Daemon {
   private pending: PendingDecision[] = [];
   private recent: RecentMove[] = [];
   private lastRun: DaemonState["lastRun"] = null;
+  private followUps: FollowUp[] = [];
   private lastMessage = "Watching for new downloads.";
   /** Questions also out on the approver's phone, so an answer in Zee can call them off. */
   private remote = new Map<string, AbortController>();
@@ -116,7 +121,8 @@ export class Daemon {
     // Re-check that each file is still where it was filed: a person may have deleted or moved
     // it since, and that happens inside subfolders the watcher does not look at.
     const recent = this.recent.map((move) => ({ ...move, present: existsSync(join(this.options.folder, move.to)) }));
-    return { folder: this.options.folder, mood, message, pending: this.pending, recent, lastRun: this.lastRun };
+    const followUps = this.followUps.filter((f) => existsSync(join(this.options.folder, f.file)));
+    return { folder: this.options.folder, mood, message, pending: this.pending, recent, lastRun: this.lastRun, followUps };
   }
 
   /** The port the API listens on, once started. */
@@ -189,6 +195,10 @@ export class Daemon {
       this.lastMessage = `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}.`;
     }
     if (result.run?.moves.length) void this.options.voice?.say(spokenSummary(result.run.moves));
+    // Newest first, each offered once.
+    for (const f of result.followUps ?? []) {
+      if (!this.followUps.some((known) => known.file === f.file)) this.followUps.unshift(f);
+    }
     // Every pass, not only after its own moves: the journal is the record, whoever wrote it.
     this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
     for (const item of result.needsDecision?.reviews ?? []) {
@@ -274,6 +284,15 @@ export class Daemon {
         if (!this.recent.some((m) => m.to === to && m.present)) return send(res, 404, { error: "not a recent move" });
         await new Promise<void>((ok, fail) => execFile("open", ["-R", join(this.options.folder, to)], (e) => (e ? fail(e) : ok())));
         return send(res, 200, { ok: true });
+      }
+      if (route === "POST /calendar") {
+        const { file } = CalendarBody.parse(body);
+        // Only a follow-up this daemon wrote, never an arbitrary path from the caller.
+        if (!this.followUps.some((f) => f.file === file)) return send(res, 404, { error: "not a follow-up" });
+        // The Calendar app opens the .ics and asks before adding the event.
+        await new Promise<void>((ok, fail) => execFile("open", [join(this.options.folder, file)], (e) => (e ? fail(e) : ok())));
+        this.followUps = this.followUps.filter((f) => f.file !== file);
+        return send(res, 200, this.state());
       }
       if (route === "POST /undo") {
         const run = await lastUndoableRun(this.options.folder);

@@ -22,6 +22,7 @@ import {
   type UndoResult,
 } from "./execute.js";
 import { contentKindOf, extractContent } from "./extract.js";
+import { writeFollowUps, type FollowUp } from "./followups.js";
 import { batchNeedsApproval, DEFAULT_BULK_LIMIT, fingerprint, isRunnable } from "./guard.js";
 import { acquireWatchLock, WatcherRunningError } from "./lock.js";
 import { notify } from "./notify.js";
@@ -348,10 +349,19 @@ async function run(folder: string, yes: boolean, temporal: boolean): Promise<voi
   if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
   recordDuration("dz.run.duration", performance.now() - started);
   recordCounts("dz.run", { moved: result.moved, failed: result.failed.length });
+  const followUps = await writeFollowUps(folder, result.moves, plan.items);
 
   console.log(`Run ${result.run}: moved ${result.moved} of ${work} files, every one verified by SHA-256.`);
   printFailures(result.failed);
+  printFollowUps(followUps);
   console.log("Changed your mind? `dz undo` puts everything back.");
+}
+
+/** Lists the calendar follow-ups a run wrote; they are only added to a calendar when opened. */
+function printFollowUps(followUps: FollowUp[], indent = ""): void {
+  if (!followUps.length) return;
+  console.log(`${indent}Follow-ups for your calendar (open one to add it): `);
+  for (const f of followUps) console.log(`${indent}  ${f.date}  ${f.title}  ->  ${f.file}`);
 }
 
 function formatCounts(counts: Partial<Record<string, number>>): string {
@@ -398,6 +408,7 @@ function printCycle(result: CycleResult): void {
     const files = result.run.moved === 1 ? "file" : "files";
     console.log(`${time}  moved ${result.run.moved} ${files} (run ${result.run.run}); \`dz undo\` reverses it`);
     for (const move of result.run.moves) console.log(`          ${move.from}  ->  ${move.to}`);
+    printFollowUps(result.followUps ?? [], "          ");
     printFailures(result.run.failed);
   } else if (result.held) {
     console.log(`${time}  not running: ${result.held}`);

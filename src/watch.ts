@@ -1,6 +1,7 @@
 import { watch } from "node:fs";
 import type { ClassifyResult } from "./classify.js";
 import { executePlan, loadPlan, movableItems, savePlan, type RunResult } from "./execute.js";
+import { writeFollowUps, type FollowUp } from "./followups.js";
 import { readJournal } from "./journal.js";
 import { batchNeedsApproval, fingerprint } from "./guard.js";
 import { buildPlan, type PlanItem } from "./plan.js";
@@ -46,6 +47,8 @@ export interface CycleResult {
   /** Why an --auto cycle did not run, if it did not. */
   held?: string;
   run?: RunResult;
+  /** Calendar follow-ups written for what this cycle filed (see followups.ts). */
+  followUps?: FollowUp[];
   /** Things only a person can decide, each offered once. */
   needsDecision?: {
     reviews: PlanItem[];
@@ -183,7 +186,9 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
     return { ...result, ...decide(offer), held: `bulk change (${runnable.length} new files) waiting for your OK` };
   }
   // The plan was just written, so this runs exactly what was saved.
-  return { ...result, ...decide(), run: await executePlan(inbox, runnable) };
+  const run = await executePlan(inbox, runnable);
+  const followUps = await writeFollowUps(inbox, run.moves, runnable);
+  return { ...result, ...decide(), run, ...(followUps.length ? { followUps } : {}) };
 }
 
 export interface WatchControl {

@@ -11,6 +11,7 @@ let autoOpenedFor = "";
 // Lists are rebuilt only when their content changes, so a click is never lost to a redraw.
 let drawnPending = "";
 let drawnRecent = "";
+let drawnComing = "";
 
 /** Port and token come from the daemon's info file (read by the Tauri side), or the URL when previewed in a browser. */
 async function connect() {
@@ -64,11 +65,18 @@ function render(state) {
   }
   // Only files that are still where Zee put them: not undone, not deleted or moved away since.
   const recent = state.recent.filter((m) => m.current && m.present).slice(0, 8);
-  $("empty").hidden = recent.length > 0 || state.pending.length > 0;
+  $("empty").hidden = recent.length > 0 || state.pending.length > 0 || (state.followUps ?? []).length > 0;
   const recentKey = JSON.stringify(recent);
   if (recentKey !== drawnRecent) {
     drawnRecent = recentKey;
     drawRecent(recent);
+  }
+
+  const coming = state.followUps ?? [];
+  const comingKey = JSON.stringify(coming);
+  if (comingKey !== drawnComing) {
+    drawnComing = comingKey;
+    drawComing(coming);
   }
 
   // Open the bubble once by itself when a new question comes in; after that the person decides.
@@ -97,6 +105,34 @@ function drawPending(decisions) {
     }),
   );
 
+}
+
+// Follow-ups for what was filed (a due date, a booking, a warranty's end). Nothing
+// reaches the calendar until the person clicks, and the Calendar app asks again.
+function drawComing(followUps) {
+  $("coming-title").hidden = followUps.length === 0;
+  $("coming").replaceChildren(
+    ...followUps.map((followUp) => {
+      const li = document.createElement("li");
+      const text = Object.assign(document.createElement("div"), { className: "what" });
+      text.append(
+        Object.assign(document.createElement("div"), { textContent: followUp.title }),
+        Object.assign(document.createElement("div"), { className: "when", textContent: followUp.date }),
+      );
+      const add = Object.assign(document.createElement("button"), { type: "button", textContent: "Add to calendar" });
+      add.onclick = async () => {
+        add.disabled = true;
+        try {
+          render(await call("POST", "/calendar", { file: followUp.file }));
+        } catch (error) {
+          add.disabled = false;
+          showError(error);
+        }
+      };
+      li.append(text, add);
+      return li;
+    }),
+  );
 }
 
 function drawRecent(recent) {

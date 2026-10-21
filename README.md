@@ -201,6 +201,21 @@ pnpm dz preview demo/inbox
 
 Built with TabPFN. The v2 weights are under the [Prior Labs License](https://huggingface.co/Prior-Labs/TabPFN-v2-clf/blob/main/LICENSE.txt) (Apache 2.0 with an additional attribution requirement); newer TabPFN weights need a license acceptance and an API key, so Dropzone Zero does not use them.
 
+## Calendar follow-ups
+
+Filing a document is half the job; an invoice still has to be paid. When `dz run`, `dz tidy`, or the watcher behind Zee files an invoice, a booking, or a warranty, Dropzone Zero writes a calendar event for what comes next into `Calendar/Follow-ups/`:
+
+| Filed document | Event | Reminder |
+|---|---|---|
+| Invoice | "Pay: Pixelwave hosting invoice" on the due date | a day before |
+| Booking | "Seaside hotel booking" on the date in its name | a day before |
+| Warranty | "Warranty ends: Cordless drill warranty" on the end date | 30 days before |
+
+- **Only dates that are written down.** An invoice's due date and a warranty's end are read from the text right after a label ("Due date", "Pay by", "Valid until", "납부기한", ...) and kept only if the date really appears there; the date Gemma reads is the document's main date (for an invoice, the day it was issued), so it is not used for these. A booking uses the date in its filed name, which was grounded the same way. Photos have no text to read, so they get no follow-up.
+- **Only what is still ahead.** Past dates get no event.
+- **Nothing reaches your calendar on its own.** The `.ics` files just sit in the folder. Zee lists them under **Coming up** with an **Add to calendar** button, and the Calendar app asks again before it imports one. Everything stays on this machine.
+- Undoing a run leaves its follow-ups in place; delete one you do not want.
+
 ## Receipts to CSV
 
 After a run, `dz receipts` reads everything under `Finance/Receipts` and `Finance/Invoices` (and anything the saved plan marks as a receipt or invoice but has not moved yet), including photographed receipts, and writes `Finance/receipts-YYYY-MM-DD.csv`:

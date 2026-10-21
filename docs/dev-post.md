@@ -68,6 +68,10 @@ The executor checks the verdict again at move time, with real paths resolved, so
 
 Everyone files differently. Rather than adding a setting for every habit, Dropzone Zero watches what I put back. When I undo a single file, that is recorded as a rejected move; moves I leave alone count as accepted. Once there are enough decisions, [TabPFN](https://priorlabs.ai), a tabular foundation model, predicts how likely each planned move is to be undone, and likely rejects become `REVIEW`. TabPFN learns from a small table in one forward pass, which is exactly right for a few dozen personal decisions. It runs locally with the v2 weights and sees only metadata (extension, category, size, age, the shape of the target), never names or contents.
 
+### Filing is half the job
+
+An invoice in the right folder is still an invoice I forget to pay. So when Dropzone Zero files an invoice, a booking, or a warranty, it also writes a calendar event for what comes next: "Pay: Pixelwave hosting invoice" a day before it is due, the hotel booking on its date, "Warranty ends" a month before it does. The same rule as everywhere else applies: the due date is read from the text next to "Due date" or "Pay by" and kept only if it is really written there, because the date Gemma picks for an invoice is the day it was issued, not the day it is due. The events are plain `.ics` files that wait in `Calendar/Follow-ups`; Zee shows them under **Coming up**, and one click hands one to the Calendar app, which asks before adding it. On the demo folder, five documents in gave four follow-ups out; the receipt, rightly, asked nothing of me.
+
 ### Durable, watchable, and one click away
 
 - **[Temporal](https://temporal.io)** wraps `dz run` and `dz undo` as durable workflows. I killed a run after 15 of 30 files; `dz worker` finished it with 30 moved and 0 failed, and undo restored every file byte for byte.

@@ -224,6 +224,32 @@ ul {
   margin-top: 6px;
 }
 
+#coming li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+}
+#coming .what {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+#coming .when {
+  color: var(--muted);
+  font-size: 12px;
+}
+#coming button {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 #recent li button {
   all: unset;
   display: block;

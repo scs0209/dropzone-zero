@@ -5,6 +5,7 @@ import { createStep, createWorkflow } from "@mastra/core/workflows";
 import { z } from "zod";
 import type { ClassifyResult } from "./classify.js";
 import { executePlan, savePlan } from "./execute.js";
+import { writeFollowUps } from "./followups.js";
 import { fingerprint } from "./guard.js";
 import { buildPlan, PlanItemSchema } from "./plan.js";
 import { applyReviewGate, type Predictor } from "./review.js";
@@ -104,7 +105,10 @@ export function createTidyWorkflow(deps: TidyDeps) {
     outputSchema: z.object({ cancelled: z.boolean(), result: RunResultSchema.nullable() }),
     execute: async ({ inputData }) => {
       if (!inputData.confirmed) return { cancelled: true, result: null };
-      return { cancelled: false, result: await executePlan(deps.inbox, inputData.items) };
+      const result = await executePlan(deps.inbox, inputData.items);
+      // Due dates and bookings ahead become calendar follow-ups, as with dz run.
+      await writeFollowUps(deps.inbox, result.moves, inputData.items);
+      return { cancelled: false, result };
     },
   });
 

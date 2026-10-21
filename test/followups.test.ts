@@ -1,0 +1,71 @@
+import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it } from "node:test";
+import { firstDate, followUpFor, labeledDate, subjectOf, toIcs, writeFollowUps } from "../src/followups.js";
+
+const TODAY = new Date("2026-10-21T00:00:00Z");
+
+describe("calendar follow-ups", () => {
+  it("reads dates in the forms documents use", () => {
+    assert.equal(firstDate("Due date 2026-10-31"), "2026-10-31");
+    assert.equal(firstDate("due on October 31, 2026"), "2026-10-31");
+    assert.equal(firstDate("valid until 3 Oct 2028"), "2028-10-03");
+    assert.equal(firstDate("pay by 10/31/2026"), "2026-10-31");
+    assert.equal(firstDate("pay by 31/10/2026"), "2026-10-31");
+    assert.equal(firstDate("납부기한 2026년 10월 31일"), "2026-10-31");
+    assert.equal(firstDate("no date here"), null);
+  });
+
+  it("takes the date next to the label, not the first date on the page", () => {
+    const invoice = "Invoice INV-3391\nIssued 2026-10-01\nAmount due  USD 12.00\nDue date 2026-10-31";
+    assert.equal(labeledDate(invoice, /due date|due/), "2026-10-31");
+    assert.equal(labeledDate("Issued 2026-10-01", /due date|due/), null);
+  });
+
+  it("makes an event only for what is still ahead and asks something of you", () => {
+    const invoice = "Amount due USD 12.00\nDue date 2026-10-31";
+    assert.deepEqual(followUpFor("invoice", "Finance/Invoices/2026-10/2026-10-31-pixelwave-hosting-invoice.pdf", invoice, TODAY), {
+      title: "Pay: Pixelwave hosting invoice",
+      date: "2026-10-31",
+    });
+    assert.deepEqual(followUpFor("warranty", "Home/Warranties/2028-10-03-cordless-drill-warranty.pdf", "Valid until 2028-10-03", TODAY), {
+      title: "Warranty ends: Cordless drill warranty",
+      date: "2028-10-03",
+    });
+    assert.deepEqual(followUpFor("booking", "Travel/Bookings/2026-11/2026-11-14-seaside-hotel-booking.pdf", "", TODAY), {
+      title: "Seaside hotel booking",
+      date: "2026-11-14",
+    });
+    assert.equal(followUpFor("invoice", "Finance/Invoices/x.pdf", "Due date 2026-09-30", TODAY), null, "already past");
+    assert.equal(followUpFor("receipt", "Finance/Receipts/2026-11-01-x.pdf", "", TODAY), null, "a receipt asks nothing");
+    assert.equal(followUpFor("invoice", "Finance/Invoices/x.pdf", "Total USD 12.00", TODAY), null, "no due date written");
+  });
+
+  it("writes a valid all-day event with a reminder", () => {
+    const ics = toIcs({ title: "Pay: Pixelwave, hosting; invoice", date: "2026-10-31", from: "Finance/Invoices/x.pdf" }, "invoice", TODAY);
+    assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
+    assert.match(ics, /DTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261101\r\n/);
+    assert.ok(ics.includes("SUMMARY:Pay: Pixelwave\\, hosting\\; invoice\r\n"), "commas and semicolons are escaped");
+    assert.match(ics, /TRIGGER:-P1D\r\n/);
+    assert.match(ics, /END:VCALENDAR\r\n$/);
+    assert.equal(subjectOf("Home/Warranties/2028-10-03-cordless-drill-warranty-2.pdf"), "Cordless drill warranty");
+  });
+
+  it("writes follow-ups next to the filed documents, once", async () => {
+    const inbox = await mkdtemp(join(tmpdir(), "dz-followups-"));
+    await mkdir(join(inbox, "Finance/Invoices/2026-10"), { recursive: true });
+    const to = "Finance/Invoices/2026-10/2026-10-01-pixelwave-hosting-invoice.txt";
+    await writeFile(join(inbox, to), "Pixelwave Hosting\nInvoice INV-3391\nIssued 2026-10-01\nDue date 2026-10-31\n");
+    const moves = [{ from: "invoice.txt", to }, { from: "r.txt", to: "Finance/Receipts/2026-10/r.txt" }];
+    const items = [{ name: "invoice.txt", category: "invoice" as const }, { name: "r.txt", category: "receipt" as const }];
+    const written = await writeFollowUps(inbox, moves, items, TODAY);
+    assert.equal(written.length, 1);
+    assert.equal(written[0]!.file, "Calendar/Follow-ups/2026-10-31-pixelwave-hosting-invoice.ics");
+    assert.match(await readFile(join(inbox, written[0]!.file), "utf8"), /SUMMARY:Pay: Pixelwave hosting invoice/);
+    assert.equal((await writeFollowUps(inbox, moves, items, TODAY)).length, 1, "written again it changes nothing");
+    assert.ok(existsSync(join(inbox, written[0]!.file)));
+  });
+});
