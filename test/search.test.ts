@@ -7,7 +7,7 @@ import type { ModelClient } from "../src/classify.js";
 import { loadIndex, search, updateIndex, type Embed } from "../src/search.js";
 
 // A toy embedding: one dimension per topic word, enough to rank by meaning in tests.
-const TOPICS = ["receipt", "coffee", "beach", "hotel", "invoice"];
+const TOPICS = ["receipt", "coffee", "beach", "hotel", "invoice", "app"];
 const embed: Embed = async (texts) => texts.map((t) => TOPICS.map((w) => (t.toLowerCase().includes(w) ? 1 : 0)));
 
 function vision(caption: string): ModelClient & { calls: number } {
@@ -41,6 +41,7 @@ describe("find by description", () => {
     const result = await updateIndex(inbox, { client, embed });
     assert.equal(result.total, 4, "Dropzone Zero's own state is not indexed, and an app counts once");
     assert.ok((await loadIndex(inbox)).some((e) => e.path === "Notely.app"));
+    assert.equal((await search(inbox, "an app I downloaded", embed, 1))[0]!.path, "Notely.app", "found by what kind of file it is");
     assert.equal(client.calls, 1, "only the image goes to the vision model");
     assert.equal((await search(inbox, "that beach picture", embed, 1))[0]!.path, "IMG_0001.png");
     assert.equal((await search(inbox, "coffee receipt", embed, 1))[0]!.path, "Finance/Receipts/bluebird.txt");

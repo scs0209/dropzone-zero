@@ -20,6 +20,8 @@ export const DEFAULT_EMBED_MODEL = "embeddinggemma";
 export interface IndexEntry {
   /** Relative to the folder. */
   path: string;
+  /** How the vector was made; an older one is re-embedded from the kept text. */
+  v?: number;
   /** Size and modified time, so unchanged files are not read again. */
   stamp: string;
   kind: "document" | "image" | "other";
@@ -60,6 +62,60 @@ export function ollamaEmbed(host = process.env.OLLAMA_HOST ?? "http://127.0.0.1:
 
 // EmbeddingGemma's own prompt formats for search: one for what is searched, one for the question.
 const asDocument = (title: string, text: string) => `title: ${title} | text: ${text}`;
+
+/** Bump when what goes into a vector changes, so old entries are re-embedded (not re-read). */
+const INDEX_VERSION = 2;
+
+// What kind of file it is, in words, so "an app", "the slides", or "a zip" can find it
+// even when the file has no text of its own.
+const KIND_WORDS: Record<string, string> = {
+  ".app": "macOS app (application, program)",
+  ".dmg": "installer disk image for an app",
+  ".pkg": "installer package for an app",
+  ".mpkg": "installer package for an app",
+  ".exe": "Windows program installer",
+  ".msi": "Windows installer",
+  ".zip": "zip archive",
+  ".tar": "archive",
+  ".gz": "compressed archive",
+  ".pdf": "PDF document",
+  ".doc": "Word document",
+  ".docx": "Word document",
+  ".pages": "Pages document",
+  ".txt": "text note",
+  ".md": "text note",
+  ".key": "Keynote presentation slides",
+  ".ppt": "PowerPoint presentation slides",
+  ".pptx": "PowerPoint presentation slides",
+  ".numbers": "Numbers spreadsheet",
+  ".xls": "Excel spreadsheet",
+  ".xlsx": "Excel spreadsheet",
+  ".csv": "spreadsheet table (CSV)",
+  ".json": "data file (JSON)",
+  ".ics": "calendar event",
+  ".png": "image",
+  ".jpg": "image (photo)",
+  ".jpeg": "image (photo)",
+  ".heic": "photo",
+  ".gif": "animated image",
+  ".webp": "image",
+  ".svg": "vector graphic",
+  ".mp4": "video",
+  ".mov": "video",
+  ".mp3": "audio",
+  ".wav": "audio",
+};
+
+function kindWords(path: string): string {
+  const ext = extname(path).toLowerCase();
+  return KIND_WORDS[ext] ?? (ext ? `${ext.slice(1)} file` : "file");
+}
+
+/** The text a file's vector is made from: its name, what kind of file it is, where it is, and what it says. */
+function documentFor(path: string, text: string): string {
+  const where = dirname(path) === "." ? "" : ` in ${dirname(path)}`;
+  return asDocument(titleOf(path), `${kindWords(path)}${where}. ${text}`.trim());
+}
 const asQuery = (query: string) => `task: search result | query: ${query}`;
 
 const CaptionReply = z.object({ caption: z.string(), visibleText: z.string().default("") });
@@ -128,20 +184,27 @@ export async function updateIndex(inbox: string, { client, embed, onProgress }: 
   const known = new Map((await loadIndex(inbox)).map((e) => [e.path, e]));
   const paths = await filesIn(inbox);
   const kept: IndexEntry[] = [];
+  const stale: IndexEntry[] = [];
   const todo: { path: string; stamp: string }[] = [];
   for (const path of paths) {
     const info = await stat(join(inbox, path));
     if (info.isDirectory()) {
-      // A bundle: found by its name alone.
+      // A bundle: found by its name and kind.
       const old = known.get(path);
-      if (old) kept.push(old);
+      if (old?.v === INDEX_VERSION) kept.push(old);
       else todo.push({ path, stamp: "bundle" });
       continue;
     }
     const stamp = `${info.size}:${Math.round(info.mtimeMs)}`;
     const old = known.get(path);
-    if (old && old.stamp === stamp) kept.push(old);
+    if (old && old.stamp === stamp && old.v === INDEX_VERSION) kept.push(old);
+    else if (old && old.stamp === stamp) stale.push(old);
     else todo.push({ path, stamp });
+  }
+  // Unchanged files from an older index: only the vector is made again, from the kept text.
+  if (stale.length) {
+    const vectors = await embed(stale.map((e) => documentFor(e.path, e.text === titleOf(e.path) ? "" : e.text)));
+    stale.forEach((e, i) => kept.push({ ...e, v: INDEX_VERSION, vector: vectors[i]! }));
   }
   const fresh: IndexEntry[] = [];
   for (const [i, { path, stamp }] of todo.entries()) {
@@ -158,9 +221,8 @@ export async function updateIndex(inbox: string, { client, embed, onProgress }: 
       kind = contentKindOf(ext) === "image" ? "image" : "document";
       text = content.text.replace(/\s+/g, " ").slice(0, 1200);
     }
-    const title = titleOf(path);
-    const [vector] = await embed([asDocument(title, `${dirname(path)} ${text}`.trim())]);
-    fresh.push({ path, stamp, kind, text: text || title, vector: vector! });
+    const [vector] = await embed([documentFor(path, text)]);
+    fresh.push({ path, stamp, v: INDEX_VERSION, kind, text: text || titleOf(path), vector: vector! });
     onProgress?.(i + 1, todo.length);
     // Saved as it goes, so a long first index survives an interruption.
     if ((i + 1) % 10 === 0) await saveIndex(inbox, [...kept, ...fresh]);
@@ -195,16 +257,24 @@ export async function search(inbox: string, query: string, embed: Embed, limit =
       return { path: e.path, score: cosine(q!, e.vector) + 0.05 * named, why: e.text.slice(0, 140) };
     })
     .sort((a, b) => b.score - a.score);
-  // Only what is close to the best match: a clear winner comes back alone, and nothing
-  // comes back when even the best is a poor match. Measured: on the demo set the right
-  // answers scored 0.39-0.70; on a real Downloads folder with no such file, unrelated
-  // photos scored up to 0.31 just for being photos.
-  const best = ranked[0]?.score ?? 0;
-  return ranked.filter((hit) => hit.score >= MIN_SCORE && hit.score >= best - CLOSE_TO_BEST).slice(0, limit);
+  // Only what is close to the best match, and nothing when even the best is a poor one.
+  // Measured: on the demo set the right answers scored 0.37-0.70; on a real Downloads
+  // folder with no such file, unrelated photos scored up to 0.31 just for being photos.
+  const [best, second] = ranked;
+  if (!best) return [];
+  if (best.score >= MIN_SCORE) return ranked.filter((hit) => hit.score >= MIN_SCORE && hit.score >= best.score - CLOSE_TO_BEST).slice(0, limit);
+  // Files with little text of their own (an app, a scan) score lower; one that still
+  // clearly beats everything else is the answer. Measured: an app asked for as "an app
+  // I downloaded" scored 0.32 against 0.27 for the next file, while unrelated photos
+  // for a missing receipt photo scored 0.31 and 0.29, no clear winner.
+  if (best.score >= WINNER_FLOOR && best.score - (second?.score ?? 0) >= WINNER_MARGIN) return [best];
+  return [];
 }
 
 const MIN_SCORE = 0.35;
 const CLOSE_TO_BEST = 0.08;
+const WINNER_FLOOR = 0.28;
+const WINNER_MARGIN = 0.04;
 
 /** A stable short id for a path, so the UI can ask to reveal a hit without sending a path back. */
 export function hitId(path: string): string {
