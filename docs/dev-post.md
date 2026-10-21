@@ -107,7 +107,9 @@ The unit tests (142 of them now) kept passing while most of these bugs were live
 
 With [Auth0](https://auth0.com)'s Client-Initiated Backchannel Authentication (CIBA), the guard's questions also reach my phone as a Guardian push: **Allow** and the installer is filed, **Deny** and it stays. Whichever answer comes first, Zee or the phone, decides. The push says only "Dropzone Zero: move 1 installer", never a file name. The daemon only makes outgoing requests, and an approval releases exactly one held move through the same guard. Setting it up meant four clear errors (a missing notification channel, push off for the tenant, an unenrolled approver, and `access_denied` meaning both "declined" and "timed out"). Then a daemon watching a synthetic folder moved a held installer 13 seconds after I tapped **Allow**.
 
-[GIF 삽입: 휴대폰 승인 과정 — 합성 인스톨러가 들어오면 Zee가 손을 흔들며 질문 → 휴대폰에 "Dropzone Zero: move 1 installer" Guardian 푸시 → Allow 탭 → 파일이 Installers로 이동하고 Zee의 질문이 닫히는 장면]
+![The Auth0 Guardian approval on my phone: "Dropzone Zero: move 1 installer", with Deny and Approve buttons; the account and tenant are covered](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/phone-approval.png)
+
+*The real push for a synthetic installer (my phone is set to Korean: 거부 is Deny, 승인 is Approve). I covered my account and tenant. Guardian showed a blank cover while I screen-recorded, so this is a screenshot.*
 
 ### Gemma or a fine-tuned Qwen? I measured first
 
