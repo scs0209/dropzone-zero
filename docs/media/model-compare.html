@@ -1,0 +1,69 @@
+<!doctype html>
+<!--
+  The model comparison chart in the DEV post (1000x480). Every number is read from
+  eval/results/*-test.json at render time, so the picture cannot drift from the
+  results. The accuracy axis starts at 80%, and says so, because all three models
+  land between 92% and 100%. Rebuild with: pnpm media:chart
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Model comparison</title>
+    <style>
+      * { margin: 0; box-sizing: border-box; }
+      html, body { width: 1000px; height: 480px; overflow: hidden; background: #15191c; }
+      body {
+        font-family: "SF Pro Text", -apple-system, "Helvetica Neue", Arial, sans-serif;
+        color: #f1ebe2; padding: 40px 48px;
+      }
+      h1 { font-family: "SF Pro Display", -apple-system, "Helvetica Neue", Arial, sans-serif; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+      .sub { color: #9aa3a7; font-size: 15px; margin-top: 6px; }
+      .legend { display: flex; gap: 22px; margin-top: 22px; font-size: 14px; color: #c9c3ba; }
+      .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; background: var(--c); }
+      .rows { margin-top: 18px; }
+      .row { display: grid; grid-template-columns: 250px 1fr 92px; align-items: center; column-gap: 18px; padding: 14px 0; border-top: 1px solid #262c30; }
+      .name { font-size: 16px; font-weight: 600; line-height: 1.3; }
+      .name small { display: block; font-weight: 400; color: #9aa3a7; font-size: 13px; margin-top: 2px; }
+      .bars { display: grid; row-gap: 8px; }
+      .bar { display: grid; grid-template-columns: 1fr 64px; column-gap: 12px; align-items: center; }
+      .track { position: relative; height: 22px; background: #20262a; border-radius: 4px; }
+      .track i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--c); }
+      .bar b { font-size: 14px; font-weight: 600; color: #f1ebe2; text-align: right; }
+      .latency { text-align: right; font-size: 20px; font-weight: 600; }
+      .latency small { display: block; font-size: 12px; font-weight: 400; color: #9aa3a7; }
+      .axis { display: grid; grid-template-columns: 250px 1fr 92px; column-gap: 18px; font-size: 12px; color: #7f888c; margin-top: 6px; }
+      .axis div { display: flex; justify-content: space-between; margin-right: 76px; }
+      .note { position: absolute; left: 48px; bottom: 30px; font-size: 13px; color: #7f888c; }
+    </style>
+  </head>
+  <body>
+    <h1>Untuned local Gemma vs. Qwen fine-tuned on Tinker</h1>
+    <p class="sub">Same 63 synthetic test files, same prompt, same scoring (<code>dz eval</code>). Exact match on document type and date.</p>
+    <div class="legend"><span style="--c: #5dcaa5">Document type</span><span style="--c: #c79a45">Date</span></div>
+    <div class="rows" id="rows"></div>
+    <div class="axis"><span></span><div><span>80%</span><span>85%</span><span>90%</span><span>95%</span><span>100%</span></div><span></span></div>
+    <p class="note">Accuracy axis starts at 80%. Latency is p50 per file: Gemma on my Mac, Qwen one request at a time over the network.</p>
+    <script type="module">
+      const models = [
+        ["ollama_gemma4_e4b", "gemma4:e4b", "local in Ollama, untuned (the app)"],
+        ["tinker_qwen3.5-4b-base", "Qwen3.5-4B", "on Tinker, untrained"],
+        ["tinker_qwen3.5-4b-lora", "Qwen3.5-4B + LoRA", "on Tinker, after fine-tuning"],
+      ];
+      const FLOOR = 0.8;
+      const width = (value) => `${(Math.max(0, value - FLOOR) / (1 - FLOOR)) * 100}%`;
+      const pct = (value) => `${(value * 100).toFixed(1).replace(/\.0$/, "")}%`;
+      const bar = (value, color) =>
+        `<div class="bar" style="--c: ${color}"><div class="track"><i style="width: ${width(value)}"></i></div><b>${pct(value)}</b></div>`;
+      const rows = document.getElementById("rows");
+      for (const [file, name, detail] of models) {
+        const result = await (await fetch(`../../eval/results/${file}-test.json`)).json();
+        rows.insertAdjacentHTML(
+          "beforeend",
+          `<div class="row"><div class="name">${name}<small>${detail}</small></div>
+           <div class="bars">${bar(result.categoryAccuracy, "#5dcaa5")}${bar(result.dateAccuracy, "#c79a45")}</div>
+           <div class="latency">${(result.latencyMs.p50 / 1000).toFixed(1)} s<small>p50 latency</small></div></div>`,
+        );
+      }
+    </script>
+  </body>
+</html>

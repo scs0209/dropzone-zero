@@ -127,7 +127,7 @@ So the app keeps Gemma, untuned. The task isn't hard enough to need more: readin
 
 A word on Tinker, because it surprised me. Fine-tuning had always sounded like a project of its own: rent GPUs, set up a training stack, babysit a run. Here the whole experiment is one 108-line Python script: create a LoRA training client, call `forward_backward` and `optim_step` per batch, save the weights, sample from the tuned model. I never touched a GPU. Writing the evaluation took longer than writing the training.
 
-[이미지 삽입: 실제 모델 비교 결과 — `eval/results/`의 세 결과 파일(ollama_gemma4_e4b, tinker_qwen3.5-4b-base, tinker_qwen3.5-4b-lora)을 나란히 보여 주는 `dz eval` 출력 화면 또는 위 표의 차트(카테고리·날짜 정확도)]
+![Document type and date accuracy for gemma4:e4b, untrained Qwen3.5-4B, and Qwen3.5-4B after LoRA, on the same 63 synthetic test files](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/model-compare.png)
 
 [agent_session 삽입: Tinker 파인튜닝 세션 — Qwen3.5-4B 기준선 샘플링 → LoRA 학습 로그(epoch별 loss 0.2397 → 0.0026 → 0.0005) → `dz eval --provider replay`로 채점한 결과까지의 실행 기록]
 

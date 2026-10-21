@@ -24,6 +24,7 @@
     "eval:make": "node --import tsx scripts/make-eval.ts",
     "media:demo": "bash scripts/make-demo-gif.sh",
     "media:cover": "bash scripts/make-cover.sh",
+    "media:chart": "bash scripts/make-chart.sh",
     "media:zee": "node --import tsx scripts/record-zee.ts"
   },
   "devDependencies": {
