@@ -5,6 +5,7 @@ import { z } from "zod";
 import { isDateWritten, normalizeDate, readJsonReply, type ModelClient } from "./classify.js";
 import { loadPlan } from "./execute.js";
 import type { ExtractedContent } from "./extract.js";
+import { loadIgnore } from "./ignore.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
 
 // Receipt-to-CSV: reads the receipts and invoices Dropzone Zero has filed (or
@@ -76,7 +77,9 @@ export async function findReceiptFiles(inbox: string): Promise<ReceiptFile[]> {
       if ((kind === "receipt" || kind === "invoice") && !found.has(file.sha256)) found.set(file.sha256, { file, kind });
     }
   }
-  return [...found.values()].sort((a, b) => a.file.path.localeCompare(b.file.path));
+  // Nothing listed in .dropzoneignore is read, here or anywhere else.
+  const ignored = loadIgnore(inbox);
+  return [...found.values()].filter(({ file }) => !ignored(relative(inbox, file.path))).sort((a, b) => a.file.path.localeCompare(b.file.path));
 }
 
 export function buildReceiptPrompt(content: ExtractedContent): string {

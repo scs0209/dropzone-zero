@@ -63,4 +63,13 @@ describe("find by description", () => {
     assert.equal(after.indexed, 1);
     assert.deepEqual((await loadIndex(inbox)).map((e) => e.path).sort(), ["Finance/Receipts/bluebird.txt", "IMG_0001.png", "Notely.app", "invoice.txt"]);
   });
+
+  it("never reads or indexes what .dropzoneignore lists", async () => {
+    const inbox = await folder();
+    await writeFile(join(inbox, ".dropzoneignore"), "*.png\nFinance/\n");
+    const client = vision("A photo of a sunny beach.");
+    await updateIndex(inbox, { client, embed });
+    assert.equal(client.calls, 0, "the image is never shown to the model");
+    assert.deepEqual((await loadIndex(inbox)).map((e) => e.path), ["Notely.app", "hotel.txt"]);
+  });
 });

@@ -174,6 +174,32 @@ Away from the Mac, Zee can still ask. With the four `AUTH0_*` settings in `.env`
 
 Setup: create a Regular Web application in Auth0 (first-party), enable the CIBA grant with the Guardian push channel, turn on "Push Notification using Auth0 Guardian" under Security > Multi-factor Auth, and enroll the approving user in Guardian. Then set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, and `AUTH0_APPROVER_USER_ID`. Auth0's docs list CIBA under the Enterprise plan or an add-on; check that your tenant allows it.
 
+## What each part can touch
+
+Every feature is limited to what it needs. Moves of your files always go through the guard and the hash-checked, journaled executor; the rest is listed here.
+
+| Part | Reads | Changes | Leaves the machine |
+|---|---|---|---|
+| Filing (`dz run`, `dz watch --auto`, Zee) | New files in the folder (text, images to local Gemma) | Moves files inside the folder; duplicates and temp files go to quarantine, nothing is deleted | Nothing |
+| Calendar follow-ups | Filed invoices, bookings, warranties | Writes `.ics` files to `Calendar/Follow-ups`; undo moves them to quarantine | Nothing |
+| Calendar removal | Your Calendar, only events whose notes carry a Dropzone Zero ID and that you added from Zee | Deletes those events (AppleScript; macOS asks once) | Nothing |
+| Search (`dz find`, Zee) | Every file in the folder (images described by local Gemma) | Writes `.dropzone/search-index.jsonl` | Nothing |
+| Phone approval (Auth0, optional) | Nothing | Releases exactly one held move | A short label such as "move 1 installer" |
+| Voice (ElevenLabs, optional) | Nothing | Nothing | A sentence of kinds and counts, such as "Filed two receipts" |
+| Telemetry (Sentry, optional) | Nothing | Nothing | Counts, timings, token counts, scrubbed errors |
+
+**Keeping files out entirely.** List them in a `.dropzoneignore` file in the folder, and Dropzone Zero never reads them, never shows them to a model, never indexes them for search, and never moves them:
+
+```
+# .dropzoneignore
+*.key          # by name, in any folder
+passport*      # names starting with "passport"
+Taxes/         # a folder and everything in it
+Scans/*.pdf    # a path from the top of the folder
+```
+
+`DZ_SEARCH=off` turns search off altogether: nothing is read or described for it.
+
 ## How a run stays safe
 
 - `dz run` executes exactly the plan you previewed. The model is not asked again, so what you saw is what happens.

@@ -12,6 +12,7 @@ import { basename, dirname, extname, join, relative } from "node:path";
 import { z } from "zod";
 import { readJsonReply, type ModelClient } from "./classify.js";
 import { contentKindOf, extractContent } from "./extract.js";
+import { loadIgnore } from "./ignore.js";
 import { STATE_DIR } from "./plan.js";
 
 export const SEARCH_INDEX = `${STATE_DIR}/search-index.jsonl`;
@@ -143,15 +144,19 @@ function titleOf(path: string): string {
 
 const BUNDLE = /\.(app|bundle|framework|pkg|mpkg|photoslibrary|xcodeproj|key|pages|numbers)$/i;
 
-/** Every file worth finding: everything except Dropzone Zero's own state and hidden files. */
-async function filesIn(root: string, dir = root): Promise<string[]> {
+/**
+ * Every file worth finding: everything except Dropzone Zero's own state, hidden
+ * files, and what .dropzoneignore lists (never read, never shown to a model).
+ */
+async function filesIn(root: string, dir = root, ignored = loadIgnore(root)): Promise<string[]> {
   const found: string[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (entry.name.startsWith(".")) continue;
     const full = join(dir, entry.name);
+    if (ignored(relative(root, full))) continue;
     // An app or other macOS bundle is one thing to find, not hundreds of files inside it.
     if (entry.isDirectory() && BUNDLE.test(entry.name)) found.push(relative(root, full));
-    else if (entry.isDirectory()) found.push(...(await filesIn(root, full)));
+    else if (entry.isDirectory()) found.push(...(await filesIn(root, full, ignored)));
     else if (entry.isFile() && extname(entry.name).toLowerCase() !== ".ics") found.push(relative(root, full));
   }
   return found;

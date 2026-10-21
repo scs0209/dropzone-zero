@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { loadIgnore } from "./ignore.js";
 
 // Browsers write these while a download is still in progress.
 const PARTIAL_EXTENSIONS = new Set([".crdownload", ".part", ".download", ".partial"]);
@@ -30,9 +31,11 @@ export async function hashFile(path: string): Promise<string> {
 export async function scanFolder(dir: string, now = new Date()): Promise<ScannedFile[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const files: ScannedFile[] = [];
+  // Files listed in .dropzoneignore are never read, shown to a model, or moved.
+  const ignored = loadIgnore(dir);
 
   for (const entry of entries) {
-    if (!entry.isFile() || entry.name.startsWith(".")) continue;
+    if (!entry.isFile() || entry.name.startsWith(".") || ignored(entry.name)) continue;
     const path = join(dir, entry.name);
     const info = await stat(path);
     const ext = extname(entry.name).toLowerCase();

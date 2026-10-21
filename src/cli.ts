@@ -577,7 +577,8 @@ async function daemon(folder: string): Promise<void> {
     model: client.model,
     remoteApprover: remote ? new RemoteApprover(remote) : null,
     voice: voiceConfig ? new Voice(voiceConfig) : null,
-    search: { client, embed: ollamaEmbed() },
+    // DZ_SEARCH=off: nothing is indexed or described for search.
+    search: process.env.DZ_SEARCH === "off" ? null : { client, embed: ollamaEmbed() },
     classify: async (file) => classifyFile(client, file, await extractContent(file)),
     waitForModel: () => waitForOllama(client),
     onEvent: (result) => {
@@ -712,6 +713,7 @@ async function undo(folder: string, yes: boolean, temporal: boolean, files: stri
 
 /** Brings the search index up to date; images are described by the local model. */
 async function indexFolder(folder: string): Promise<void> {
+  if (process.env.DZ_SEARCH === "off") throw new Error("Search is turned off (DZ_SEARCH=off), so nothing is indexed.");
   const { updateIndex, ollamaEmbed } = await import("./search.js");
   const client = new OllamaClient();
   await client.ensureReady();
