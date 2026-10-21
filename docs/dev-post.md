@@ -113,9 +113,7 @@ Honestly, the unit tests (142 of them now) passed through most of this. Using th
 
 **Old files blocked new ones.** With more than 20 old files sitting in Downloads, `--auto` hit the bulk limit on every pass and moved nothing, not even the file I'd just downloaded. Now files that were already there are left alone (they're not even sent to the model), and new downloads go through.
 
-**Undo last did nothing.** I'd click it, and... nothing. The journal had no undo entries at all, which was the clue. The button asked "Are you sure?" with `window.confirm()`, and the macOS WebView that Tauri uses never shows that dialog. `confirm()` just quietly returned `false`. Now the button asks by itself: the first click turns it into "Put back?", the second click does it.
-
-**Then undo undid itself.** Fixed that, clicked Undo, the receipt went back to Downloads... and a few seconds later the watcher filed it again, because it looked like a new download. 😅 Now the watcher remembers what an undo put back. It also forgets once the file leaves, so a real re-download still gets filed. I only found that last part by trying it by hand.
+**Undo last did nothing, then undid itself.** The button asked "Are you sure?" with `window.confirm()`, which the macOS WebView in Tauri never shows, so it quietly returned `false`. Now it's a two-click "Put back?" button. Then the receipt I put back got filed again a few seconds later, because the watcher thought it was a new download. 😅 Now the watcher remembers what an undo put back, and forgets once the file leaves, so a real re-download still gets filed. Session 1 below shows how both were tracked down.
 
 **My rules were stuck in the code.** "Where each kind of file goes" lived in a table in TypeScript, so changing it meant editing code. Now a `.dropzonerules.json` in the folder can set any kind's folder and name, like `{ "receipt": { "folder": "Money/Receipts/{year}", "name": "{title}-{date}" } }`. A rule only picks a path, though. The guard still judges every move, and a rule that points outside the folder or into a hidden one stops the run with a message instead of being quietly ignored.
 
@@ -193,9 +191,7 @@ Two sessions are shared below, because they show what the code alone can't: how 
 
 ### 1. "What does the Undo last button do?", then "It didn't work, though?"
 
-Zee's **Undo last** did nothing when I clicked it. The agent started with the real journal and daemon log (counts only, paths redacted) and found no undo entries at all, so the click never reached the code that moves files. The only dialog in Zee's page was a `window.confirm()`, which the macOS WebView that Tauri uses never shows. It replaced it with a two-click button inside the bubble: "Put back?", then a second click within 4 seconds.
-
-Then it recorded the real UI against a real daemon to check. Undo ran, but the receipt was not back in the folder: the watcher had taken the put-back file for a new download and filed it again. The agent made the watcher remember what an undo put back, added a regression test, ran the whole suite, and recorded again to confirm the receipt stays put.
+Clicking **Undo last** did nothing. Instead of guessing, the agent read the real journal and daemon log first (counts only, paths redacted) and saw no undo entries at all, so the click never reached the code that moves files. That pointed straight at the `confirm()` dialog. After the fix, it recorded the real UI against a real daemon to check, and that recording is how the second bug, the re-filed receipt, showed up. It added a regression test, ran the whole suite, and recorded again.
 
 Commit: [b22e1c1](https://github.com/scs0209/dropzone-zero/commit/b22e1c1) "make Zee's Undo last work, and keep undone files where they are"
 
@@ -203,9 +199,7 @@ Commit: [b22e1c1](https://github.com/scs0209/dropzone-zero/commit/b22e1c1) "make
 
 ### 2. "Don't either of them have a free tier?", then "We use Gemma, so why fine-tune Qwen?"
 
-The agent checked Backboard and Tinker for a way to run a fine-tuned comparison. Both have free perks, but neither could pay for model calls on my account yet. Backboard's free credit was reserved for memory and RAG, and a test call to a paid Gemma model through it was refused. I put credit into Tinker and told it to go ahead, and I dropped Backboard.
-
-Tinker doesn't offer Gemma, so the agent had picked Qwen3.5-4B without telling me first. When I asked why we were tuning Qwen, it said so, and I made it a control experiment. It sampled the untrained Qwen on the 63 test cases (kind 100%, date 92.1%), trained the LoRA, and added a `replay` provider to `dz eval` so the replies were scored by the app's own pipeline. It also pointed out that models landing near 100% means my test set is too easy to tell them apart. That became the honest finding in the post.
+It started with money: the agent checked whether Backboard or Tinker could pay for a fine-tuned comparison on free credit. Backboard's free credit was only for memory and RAG, and a test call to a paid Gemma model through it was refused, so I added credit to Tinker and dropped Backboard. Then came my "why Qwen?" question from above. After that, you can watch it sample the untrained Qwen, train the LoRA, and add a `replay` provider to `dz eval` so the replies were scored by the app's own pipeline. It was also the one to point out that scores near 100% meant my test set was too easy.
 
 Commit: [5c886f0](https://github.com/scs0209/dropzone-zero/commit/5c886f0) "fine-tune a control model on Tinker; drop Backboard"
 
@@ -232,7 +226,7 @@ And the best part is that being lazy is actually safe here. If Gemma gets one wr
 - **Best Use of Sentry Agent Tracing**: a `gen_ai.chat` span per model call with tokens and latency, and nothing private in it.
 - **Best Use of Entire**: Entire recorded the Claude Code sessions I built this with, as checkpoints pushed to a separate repo, so the undo bug chase and the Tinker run above can be traced back to the conversations that produced them.
 
-I also tried a couple of things I didn't enter. Backboard's free credit covered memory and RAG but not model calls, so the model comparison moved to Tinker. And a voice for Zee with ElevenLabs is coded, but I haven't run it with a real key yet.
+I also tried Backboard (its free credit didn't cover model calls; see session 2) and coded an ElevenLabs voice for Zee that I haven't run with a real key yet. Neither is entered.
 
 ## Credits
 
