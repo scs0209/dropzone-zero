@@ -349,7 +349,7 @@ async function run(folder: string, yes: boolean, temporal: boolean): Promise<voi
   if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
   recordDuration("dz.run.duration", performance.now() - started);
   recordCounts("dz.run", { moved: result.moved, failed: result.failed.length });
-  const followUps = await writeFollowUps(folder, result.moves, plan.items);
+  const followUps = await writeFollowUps(folder, result.moves, plan.items, new Date(), result.run);
 
   console.log(`Run ${result.run}: moved ${result.moved} of ${work} files, every one verified by SHA-256.`);
   printFailures(result.failed);

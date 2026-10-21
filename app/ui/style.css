@@ -250,6 +250,16 @@ ul {
   cursor: pointer;
 }
 
+#coming button.dismiss {
+  border: none;
+  padding: 2px 6px;
+  color: var(--muted);
+  font-size: 15px;
+}
+#coming button.dismiss:hover {
+  color: var(--ink);
+}
+
 #recent li button {
   all: unset;
   display: block;

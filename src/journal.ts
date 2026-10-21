@@ -16,6 +16,10 @@ export type JournalEntry = { run: string; at: string } & (
   | { op: "reject"; from: string }
   | { op: "restore"; from: string; to: string; state: "done" | "failed"; error?: string }
   | { op: "rmdir"; dir: string }
+  /** A calendar follow-up written for a filed document (see followups.ts). */
+  | { op: "followup"; file: string; from: string }
+  /** An undo set a run's follow-up aside in quarantine. */
+  | { op: "followup-aside"; file: string; to: string }
   | { op: "undo-end"; restored: number; failed: number }
 );
 

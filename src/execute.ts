@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, rmdir, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { checkBeforeMove, checkBeforeRestore, fingerprint, isRunnable } from "./guard.js";
 import { Journal, newRunId, readJournal } from "./journal.js";
-import { PlanItemSchema, STATE_DIR, type PlanItem } from "./plan.js";
+import { PlanItemSchema, QUARANTINE_DIR, STATE_DIR, type PlanItem } from "./plan.js";
 import { hashFile } from "./scan.js";
 
 export const SavedPlanSchema = z.object({
@@ -251,8 +251,34 @@ export async function restoreOne(inbox: string, run: string, move: MoveRecord): 
   }
 }
 
-/** Removes the folders a run created, deepest first. rmdir only removes empty folders, so nothing the user added is lost. */
-export async function removeCreatedDirs(inbox: string, run: string): Promise<void> {
+/**
+ * Moves a run's calendar follow-ups into quarantine (never deletes them), so an
+ * undone filing leaves no reminder behind. With `forFiles` (filed paths), only
+ * the follow-ups for those documents.
+ */
+export async function setAsideFollowUps(inbox: string, run: string, forFiles?: string[]): Promise<void> {
+  const journal = new Journal(inbox, run);
+  for (const entry of await readJournal(inbox)) {
+    if (entry.run !== run || entry.op !== "followup") continue;
+    if (forFiles && !forFiles.includes(entry.from)) continue;
+    const from = inside(inbox, entry.file);
+    if (!existsSync(from)) continue;
+    const dir = join(QUARANTINE_DIR, "follow-ups");
+    await mkdir(inside(inbox, dir), { recursive: true });
+    let to = `${dir}/${basename(entry.file)}`;
+    for (let n = 2; existsSync(inside(inbox, to)); n++) to = `${dir}/${basename(entry.file, ".ics")}-${n}.ics`;
+    await rename(from, inside(inbox, to));
+    await journal.write({ op: "followup-aside", file: entry.file, to });
+  }
+}
+
+/**
+ * Undoes what a run created besides moves: its follow-ups go to quarantine, then
+ * its folders are removed, deepest first. rmdir only removes empty folders, so
+ * nothing the user added is lost.
+ */
+export async function removeCreatedDirs(inbox: string, run: string, forFiles?: string[]): Promise<void> {
+  await setAsideFollowUps(inbox, run, forFiles);
   const journal = new Journal(inbox, run);
   const dirs = (await readJournal(inbox)).flatMap((e) => (e.run === run && e.op === "mkdir" ? [e.dir] : [])).reverse();
   for (const dir of dirs) {
@@ -295,6 +321,7 @@ export async function undoFiles(inbox: string, run: string, names: string[]): Pr
   const journal = new Journal(inbox, run);
   const moves = await movesToUndo(inbox, run);
   const result: UndoResult & { unmatched: string[] } = { run, restored: 0, failed: [], unmatched: [] };
+  const putBack: string[] = [];
   for (const name of names) {
     const move = moves.find((m) => m.from === name || m.to === name || m.to.split("/").pop() === name);
     if (!move) {
@@ -303,9 +330,11 @@ export async function undoFiles(inbox: string, run: string, names: string[]): Pr
     }
     await journal.write({ op: "reject", from: move.from });
     const step = await restoreOne(inbox, run, move);
-    if (step.ok) result.restored++;
-    else result.failed.push({ name: step.name, error: step.error! });
+    if (step.ok) {
+      result.restored++;
+      putBack.push(move.to);
+    } else result.failed.push({ name: step.name, error: step.error! });
   }
-  await removeCreatedDirs(inbox, run);
+  await removeCreatedDirs(inbox, run, putBack);
   return result;
 }

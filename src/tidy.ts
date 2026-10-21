@@ -107,7 +107,7 @@ export function createTidyWorkflow(deps: TidyDeps) {
       if (!inputData.confirmed) return { cancelled: true, result: null };
       const result = await executePlan(deps.inbox, inputData.items);
       // Due dates and bookings ahead become calendar follow-ups, as with dz run.
-      await writeFollowUps(deps.inbox, result.moves, inputData.items);
+      await writeFollowUps(deps.inbox, result.moves, inputData.items, new Date(), result.run);
       return { cancelled: false, result };
     },
   });

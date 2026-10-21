@@ -14,6 +14,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { categoryOfTarget, isDateWritten, normalizeDate, type Category } from "./classify.js";
 import { contentKindOf, extractContent } from "./extract.js";
+import { Journal } from "./journal.js";
 import type { PlanItem } from "./plan.js";
 
 export const FOLLOW_UP_DIR = "Calendar/Follow-ups";
@@ -128,12 +129,16 @@ export function toIcs(event: Omit<FollowUp, "file">, category: Category, now = n
   ].join("\r\n");
 }
 
-/** Writes a follow-up for each filed invoice, booking, or warranty that has a date ahead. */
+/**
+ * Writes a follow-up for each filed invoice, booking, or warranty that has a date
+ * ahead. With `run`, each new one is journaled, so undoing the run sets it aside.
+ */
 export async function writeFollowUps(
   inbox: string,
   moves: { from: string; to: string }[],
   items: Pick<PlanItem, "name" | "category">[] = [],
   today = new Date(),
+  run?: string,
 ): Promise<FollowUp[]> {
   const written: FollowUp[] = [];
   for (const move of moves) {
@@ -156,8 +161,14 @@ export async function writeFollowUps(
     const file = `${FOLLOW_UP_DIR}/${event.date}-${basename(move.to, extname(move.to)).replace(/^\d{4}-\d{2}-\d{2}-/, "")}.ics`;
     const followUp = { ...event, file, from: move.to };
     if (!existsSync(join(inbox, file))) {
-      await mkdir(join(inbox, FOLLOW_UP_DIR), { recursive: true });
+      // Folders made here are journaled like a run's own, so undo removes them when empty.
+      for (const dir of ["Calendar", FOLLOW_UP_DIR]) {
+        if (existsSync(join(inbox, dir))) continue;
+        await mkdir(join(inbox, dir));
+        if (run) await new Journal(inbox, run).write({ op: "mkdir", dir });
+      }
       await writeFile(join(inbox, file), toIcs(followUp, category, today));
+      if (run) await new Journal(inbox, run).write({ op: "followup", file, from: move.to });
     }
     written.push(followUp);
   }

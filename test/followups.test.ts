@@ -4,7 +4,9 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { undoFiles, undoRun } from "../src/execute.js";
 import { firstDate, followUpFor, labeledDate, subjectOf, toIcs, writeFollowUps } from "../src/followups.js";
+import { Journal } from "../src/journal.js";
 
 const TODAY = new Date("2026-10-21T00:00:00Z");
 
@@ -67,5 +69,35 @@ describe("calendar follow-ups", () => {
     assert.match(await readFile(join(inbox, written[0]!.file), "utf8"), /SUMMARY:Pay: Pixelwave hosting invoice/);
     assert.equal((await writeFollowUps(inbox, moves, items, TODAY)).length, 1, "written again it changes nothing");
     assert.ok(existsSync(join(inbox, written[0]!.file)));
+  });
+
+  it("sets a run's follow-ups aside in quarantine when the run is undone", async () => {
+    const inbox = await mkdtemp(join(tmpdir(), "dz-followups-undo-"));
+    const run = "20261021T000000000Z";
+    const docs = [
+      { from: "invoice.txt", to: "Finance/Invoices/2026-10/2026-10-01-pixelwave-invoice.txt", text: "Due date 2026-10-31" },
+      { from: "warranty.txt", to: "Home/Warranties/2026-01-01-drill-warranty.txt", text: "Valid until 2028-10-03" },
+    ];
+    const journal = new Journal(inbox, run);
+    for (const doc of docs) {
+      await mkdir(join(inbox, doc.to, ".."), { recursive: true });
+      await writeFile(join(inbox, doc.to), doc.text);
+      const sha256 = (await import("node:crypto")).createHash("sha256").update(doc.text).digest("hex");
+      await journal.write({ op: "move", from: doc.from, to: doc.to, sha256, state: "done" });
+    }
+    const items = [{ name: "invoice.txt", category: "invoice" as const }, { name: "warranty.txt", category: "warranty" as const }];
+    const written = await writeFollowUps(inbox, docs, items, TODAY, run);
+    assert.equal(written.length, 2);
+
+    // Moving back one file sets aside only its follow-up.
+    await undoFiles(inbox, run, ["invoice.txt"]);
+    assert.ok(!existsSync(join(inbox, written[0]!.file)));
+    assert.ok(existsSync(join(inbox, ".dropzone/quarantine/follow-ups", "2026-10-31-pixelwave-invoice.ics")));
+    assert.ok(existsSync(join(inbox, written[1]!.file)), "the warranty's follow-up stays");
+
+    // Undoing the whole run sets aside the rest, and deletes nothing.
+    await undoRun(inbox, run);
+    assert.ok(!existsSync(join(inbox, written[1]!.file)));
+    assert.ok(existsSync(join(inbox, ".dropzone/quarantine/follow-ups", "2028-10-03-drill-warranty.ics")));
   });
 });

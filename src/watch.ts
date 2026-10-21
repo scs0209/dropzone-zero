@@ -187,7 +187,7 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
   }
   // The plan was just written, so this runs exactly what was saved.
   const run = await executePlan(inbox, runnable);
-  const followUps = await writeFollowUps(inbox, run.moves, runnable);
+  const followUps = await writeFollowUps(inbox, run.moves, runnable, new Date(), run.run);
   return { ...result, ...decide(), run, ...(followUps.length ? { followUps } : {}) };
 }
 

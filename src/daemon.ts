@@ -294,6 +294,13 @@ export class Daemon {
         this.followUps = this.followUps.filter((f) => f.file !== file);
         return send(res, 200, this.state());
       }
+      if (route === "POST /dismiss") {
+        const { file } = CalendarBody.parse(body);
+        // Off the list only; the .ics file stays in Calendar/Follow-ups.
+        if (!this.followUps.some((f) => f.file === file)) return send(res, 404, { error: "not a follow-up" });
+        this.followUps = this.followUps.filter((f) => f.file !== file);
+        return send(res, 200, this.state());
+      }
       if (route === "POST /undo") {
         const run = await lastUndoableRun(this.options.folder);
         if (!run) return send(res, 200, { ...this.state(), message: "Nothing to undo." });

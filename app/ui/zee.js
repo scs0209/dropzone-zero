@@ -129,7 +129,19 @@ function drawComing(followUps) {
           showError(error);
         }
       };
-      li.append(text, add);
+      // Takes it off this list only; the .ics file stays in Calendar/Follow-ups.
+      const dismiss = Object.assign(document.createElement("button"), { type: "button", className: "dismiss", textContent: "×", title: "Dismiss" });
+      dismiss.setAttribute("aria-label", `Dismiss ${followUp.title}`);
+      dismiss.onclick = async () => {
+        dismiss.disabled = true;
+        try {
+          render(await call("POST", "/dismiss", { file: followUp.file }));
+        } catch (error) {
+          dismiss.disabled = false;
+          showError(error);
+        }
+      };
+      li.append(text, add, dismiss);
       return li;
     }),
   );
