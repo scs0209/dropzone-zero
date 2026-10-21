@@ -82,6 +82,8 @@ The first working version was a CLI, and using it every day showed its limits: I
 
 Zee is a [Tauri](https://tauri.app) app, about 10 MB, with a robot built from [three.js](https://threejs.org) shapes. It never touches files: it talks to a local daemon on `127.0.0.1` with a token only my user can read, and every click goes through the same guard as the CLI. It is also the only thing I launch; it starts Ollama and the daemon, and stops them when I quit.
 
+I picked Tauri over Electron for three reasons. Zee is a window that never closes, so it has to be small and light: Electron ships its own copy of Chromium and Node.js inside every app, while Tauri uses the WebView macOS already has and a small Rust shell, so Zee.app is 10 MB. Tauri is also locked down by default, which suits a UI that must never touch files: Zee's page can call only the window functions its capability file lists (dragging, sizing, positioning) and Zee's own few commands, and nothing else. And a transparent, always-on-top window with a menu bar icon is built in. The system WebView had a cost I only found later: it doesn't show `window.confirm()` dialogs, which is exactly how the Undo button failed silently.
+
 ### What testing and daily use broke, and what I added
 
 Most features exist because something went wrong while I used the app:
