@@ -7,7 +7,7 @@ cover_image: https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/m
 
 *This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 3: Slow and Steady](https://dev.to/challenges/hacktoberfest-week3-2026-10-19)*
 
-A few seconds after Chrome finishes a download, a small robot in the corner of my screen chews on it, and the file is gone from Downloads: renamed, dated, and filed. Gemma 4 does the reading, on my laptop. On 63 synthetic test documents it names the kind of document right 98.4% of the time and the date right every time, at a median of 3.6 seconds a file. Nothing is deleted, every move is checked by SHA-256 before and after, and **Undo last** puts any of it back byte for byte.
+A few seconds after Chrome finishes a download, the small robot in the corner of my screen eats it, and the file turns up in the right folder with a name I can search for. Gemma 4 does the reading, locally on my laptop. On 63 synthetic test documents, it got the document type right 98.4% of the time and the date right every time, at a median of 3.6 seconds per file. Nothing is ever deleted, and **Undo last** puts any file back exactly as it was.
 
 **TL;DR**
 
