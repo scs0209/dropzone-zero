@@ -1,9 +1,10 @@
 <!doctype html>
 <!--
-  The DEV cover image (1000x420). A field of documents runs across the whole
-  frame: scattered and tilted on the left, settling into a grid sorted by kind
-  on the right. A scribble under the title straightens out the same way, and
-  Zee stands where the mess turns into order, filing a page. Rebuild with: pnpm media:cover
+  The DEV cover image (1000x420), drawn by hand in SVG. A sloth takes it easy
+  in a beanbag next to the files it never sorted, while Zee carries a page to a
+  cabinet where everything has a drawer. Zee's bubble is the "Undo last" button,
+  because undo is the point. A wobble filter keeps the lines hand-drawn, and a
+  hatch pattern does the shading. Rebuild with: pnpm media:cover
 -->
 <html lang="en">
   <head>
@@ -11,94 +12,228 @@
     <title>Dropzone Zero cover</title>
     <style>
       * { margin: 0; }
-      html, body { width: 1000px; height: 420px; overflow: hidden; background: #15191c; }
+      html, body { width: 1000px; height: 420px; overflow: hidden; background: #fffbf2; }
       svg { display: block; }
-      #robot { position: absolute; left: 596px; top: 262px; width: 168px; height: 168px; }
-      .title {
-        font-family: "SF Pro Display", -apple-system, "Helvetica Neue", Arial, sans-serif;
-        font-weight: 600; letter-spacing: -0.035em;
-      }
+      text { font-family: "Marker Felt", "Chalkboard SE", "Bradley Hand", "Comic Sans MS", cursive; fill: #1d1d1f; font-weight: 700; }
+      .o { stroke: #1d1d1f; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+      .t { stroke: #1d1d1f; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .h { fill: url(#hatch); opacity: 0.45; }
     </style>
   </head>
-  <body class="eating">
-    <svg id="cover" width="1000" height="420" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
-      <rect width="1000" height="420" fill="#15191c" />
-      <g id="tiles"></g>
-      <path id="line" fill="none" stroke="#5dcaa5" stroke-width="2" stroke-linecap="round" />
-      <text class="title" x="500" y="226" text-anchor="middle" font-size="66" fill="#f1ebe2">Dropzone Zero</text>
+  <body>
+    <svg width="1000" height="420" viewBox="0 0 1000 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="7" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="roughText" x="-2%" y="-10%" width="104%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.6" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <filter id="wash" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="11" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(40)">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#1d1d1f" stroke-width="1.5" />
+        </pattern>
+        <clipPath id="aboveGround"><rect width="1000" height="401" /></clipPath>
+        <path id="spark" d="M0 -9 L2.2 -2.2 L9 0 L2.2 2.2 L0 9 L-2.2 2.2 L-9 0 L-2.2 -2.2 Z" />
+      </defs>
+
+      <!-- Soft color washes behind each part of the scene -->
+      <g clip-path="url(#aboveGround)">
+        <g filter="url(#wash)">
+          <ellipse cx="225" cy="300" rx="190" ry="118" fill="#e3f1fc" />
+          <ellipse cx="600" cy="300" rx="118" ry="112" fill="#e2f7ef" />
+          <ellipse cx="852" cy="300" rx="132" ry="116" fill="#fff0c4" />
+        </g>
+      </g>
+
+      <!-- Title, with an offset shadow and a marker swash under "0 chores" -->
+      <g filter="url(#roughText)">
+        <path d="M592 132 Q664 124 736 131" fill="none" stroke="#a8ecd0" stroke-width="18" stroke-linecap="round" />
+        <text x="504" y="92" text-anchor="middle" font-size="78" fill="#f7c948" style="fill:#f7c948">Dropzone Zero</text>
+        <text x="500" y="88" text-anchor="middle" font-size="78">Dropzone <tspan fill="#5a3bd6">Zero</tspan></text>
+        <text x="500" y="140" text-anchor="middle" font-size="36">messy Downloads &#8594; <tspan fill="#1f9d55">0 chores</tspan></text>
+      </g>
+      <g filter="url(#rough)" fill="#f7c948" stroke="#1d1d1f" stroke-width="2" stroke-linejoin="round">
+        <use href="#spark" transform="translate(770 34) scale(1.3)" />
+        <use href="#spark" transform="translate(792 64) scale(0.8)" />
+        <use href="#spark" transform="translate(230 52) scale(1)" fill="#7fe0c4" />
+      </g>
+
+      <g filter="url(#rough)">
+        <!-- Ground and shadows -->
+        <path class="t" d="M20 402 Q300 396 520 402 T980 400" />
+        <path class="h" d="M96 400 Q230 386 372 400 Z" />
+        <path class="h" d="M548 402 Q600 392 656 402 Z" />
+        <path class="h" d="M766 402 Q850 394 946 402 Z" />
+
+        <!-- Beanbag, its shading and seam -->
+        <path class="o" fill="#9ad0f5" d="M92 396 Q84 322 160 304 L300 304 Q376 322 368 396 Z" />
+        <path class="h" d="M318 316 Q372 330 366 394 L314 394 Q342 360 318 316 Z" />
+        <path class="t" d="M130 340 Q230 372 330 340" />
+        <path fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity="0.8" d="M112 352 Q118 328 142 316" />
+
+        <!-- Sloth: arm hanging toward the pile -->
+        <path class="o" fill="none" stroke-width="26" d="M184 300 Q150 330 142 368" />
+        <path fill="none" stroke="#b98f5f" stroke-width="19" stroke-linecap="round" d="M184 300 Q150 330 142 368" />
+        <path class="t" stroke-width="3" d="M133 372 l-4 11 M141 374 l-1 12 M149 372 l3 11" />
+
+        <!-- Sloth: feet, body, belly, fur -->
+        <ellipse class="o" cx="200" cy="354" rx="20" ry="13" fill="#a47d50" />
+        <ellipse class="o" cx="262" cy="354" rx="20" ry="13" fill="#a47d50" />
+        <ellipse class="o" cx="230" cy="300" rx="62" ry="58" fill="#b98f5f" />
+        <path class="h" d="M262 252 Q296 280 288 320 Q280 346 252 356 Q284 318 262 252 Z" />
+        <ellipse class="t" cx="230" cy="308" rx="38" ry="38" fill="#dcc29a" />
+        <path class="t" stroke-width="2" d="M180 282 q-4 6 0 12 M178 306 q-4 6 0 12 M282 284 q4 6 0 12" />
+
+        <!-- Sloth: head, face, eye patches, sleepy eyes, blush, fur tufts -->
+        <ellipse class="o" cx="230" cy="228" rx="58" ry="46" fill="#b98f5f" />
+        <path class="t" stroke-width="2.2" d="M204 186 q5 -8 10 0 M224 182 q5 -8 10 0 M244 186 q5 -8 10 0" />
+        <ellipse class="t" cx="230" cy="232" rx="43" ry="34" fill="#ecdcb8" />
+        <ellipse cx="208" cy="228" rx="16" ry="9" fill="#5a3d27" transform="rotate(24 208 228)" />
+        <ellipse cx="252" cy="228" rx="16" ry="9" fill="#5a3d27" transform="rotate(-24 252 228)" />
+        <path fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" d="M200 228 q8 7 16 0 M244 228 q8 7 16 0" />
+        <ellipse cx="196" cy="248" rx="8" ry="5" fill="#f2a49a" opacity="0.7" />
+        <ellipse cx="264" cy="248" rx="8" ry="5" fill="#f2a49a" opacity="0.7" />
+        <ellipse cx="230" cy="243" rx="7" ry="5" fill="#2a1a12" />
+        <path class="t" d="M220 253 q10 8 20 0" />
+
+        <!-- Sloth: arm holding the mug -->
+        <path class="o" fill="none" stroke-width="26" d="M276 292 Q312 296 322 314" />
+        <path fill="none" stroke="#b98f5f" stroke-width="19" stroke-linecap="round" d="M276 292 Q312 296 322 314" />
+
+        <!-- Mug, heart, steam -->
+        <rect class="o" x="312" y="310" width="38" height="34" rx="7" fill="#fff" />
+        <path class="h" d="M338 312 h8 q4 0 4 6 v20 q0 6 -6 6 h-6 Z" />
+        <path d="M331 324 c-3 -4 -9 -1 -6 4 l6 6 l6 -6 c3 -5 -3 -8 -6 -4 Z" fill="#ef6f5e" />
+        <path class="t" d="M350 318 q16 2 14 14 q-2 8 -14 8" />
+        <path class="t" d="M322 296 q-6 -8 0 -14 q6 -6 0 -14 M338 298 q-6 -8 0 -14 q6 -6 0 -14" />
+        <path class="t" stroke-width="3" d="M314 318 l-6 -4 M314 326 l-7 0 M314 334 l-6 4" />
+
+        <!-- zzz -->
+        <text x="154" y="196" font-size="26" transform="rotate(-8 154 196)">z</text>
+        <text x="128" y="168" font-size="34" transform="rotate(-8 128 168)">z</text>
+
+        <!-- The pile the sloth never sorted: pages with folded corners -->
+        <g transform="rotate(-12 74 346)">
+          <path class="o" d="M24 316 H108 L124 332 V376 H24 Z" fill="#fff" />
+          <path class="t" d="M108 316 V332 H124" fill="#e7e3d8" />
+          <rect x="32" y="324" width="26" height="12" rx="2" fill="#ef6f5e" />
+          <path class="t" d="M64 330 h34 M34 344 h70" />
+        </g>
+        <g transform="rotate(8 428 368)">
+          <path class="o" d="M376 342 H464 L480 358 V394 H376 Z" fill="#ffe3df" />
+          <path class="t" d="M464 342 V358 H480" fill="#f4c9c2" />
+          <rect x="384" y="350" width="26" height="12" rx="2" fill="#1f9d55" />
+          <path class="t" d="M416 356 h40 M386 368 h70" />
+        </g>
+        <g transform="rotate(-6 442 316)">
+          <path class="o" d="M394 292 H474 L490 308 V340 H394 Z" fill="#e6f0d5" />
+          <path class="t" d="M474 292 V308 H490" fill="#cfdfba" />
+          <rect x="402" y="300" width="26" height="12" rx="2" fill="#6f8ea6" />
+          <path class="t" d="M434 306 h32 M404 316 h62" />
+        </g>
+      </g>
+
+      <!-- Pile labels, on the pages -->
+      <g filter="url(#roughText)">
+        <text x="45" y="334" font-size="9" fill="#fff" style="fill:#fff" text-anchor="middle" transform="rotate(-12 74 346)">PDF</text>
+        <text x="74" y="366" font-size="13" text-anchor="middle" transform="rotate(-12 74 346)">scan0001.pdf</text>
+        <text x="397" y="360" font-size="9" style="fill:#fff" text-anchor="middle" transform="rotate(8 428 368)">CSV</text>
+        <text x="428" y="386" font-size="13" text-anchor="middle" transform="rotate(8 428 368)">export (1).csv</text>
+        <text x="415" y="310" font-size="9" style="fill:#fff" text-anchor="middle" transform="rotate(-6 442 316)">DMG</text>
+        <text x="442" y="332" font-size="13" text-anchor="middle" transform="rotate(-6 442 316)">installer.dmg</text>
+      </g>
+
+      <g filter="url(#rough)">
+        <!-- Zee stands on the ground -->
+        <g transform="translate(0 26)">
+          <rect class="o" x="572" y="358" width="24" height="14" rx="5" fill="#9aa0a3" />
+          <rect class="o" x="610" y="358" width="24" height="14" rx="5" fill="#9aa0a3" />
+          <rect class="o" x="566" y="304" width="74" height="58" rx="14" fill="#d9dcdd" />
+          <path class="h" d="M622 308 Q638 310 638 326 V346 Q638 360 622 360 Q632 334 622 308 Z" />
+          <rect class="t" x="582" y="318" width="42" height="14" rx="5" fill="#c4c8c9" />
+          <circle cx="590" cy="346" r="3" fill="#4fd3b0" />
+          <circle cx="602" cy="346" r="3" fill="#1d1d1f" opacity="0.5" />
+          <!-- arms: one carries a page, one hangs -->
+          <path class="o" fill="none" stroke-width="14" d="M640 322 Q674 318 690 286" />
+          <path fill="none" stroke="#d9dcdd" stroke-width="7" stroke-linecap="round" d="M640 322 Q674 318 690 286" />
+          <path class="o" fill="none" stroke-width="14" d="M566 322 Q546 340 548 362" />
+          <path fill="none" stroke="#d9dcdd" stroke-width="7" stroke-linecap="round" d="M566 322 Q546 340 548 362" />
+          <g transform="rotate(12 704 262)">
+            <path class="o" d="M686 240 H712 L722 250 V286 H686 Z" fill="#fff" />
+            <path class="t" d="M712 240 V250 H722" fill="#e7e3d8" />
+            <path class="t" d="M692 256 h22 M692 266 h24 M692 276 h16" />
+          </g>
+          <!-- neck, head with shading, screen with glare -->
+          <rect class="o" x="590" y="294" width="26" height="14" rx="3" fill="#cfd2d3" />
+          <rect class="o" x="544" y="196" width="118" height="100" rx="22" fill="#f6f5f0" />
+          <path d="M650 204 Q660 212 660 226 V268 Q660 290 640 294 Q652 262 650 204 Z" fill="#dcdad2" />
+          <rect x="558" y="209" width="90" height="72" rx="11" fill="#1b2127" />
+          <path fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.35" d="M568 222 l16 -6 M568 232 l7 -3" />
+          <circle cx="583" cy="240" r="8" fill="#4fd3b0" />
+          <circle cx="623" cy="240" r="8" fill="#4fd3b0" />
+          <circle cx="586" cy="237" r="2.4" fill="#e6fff7" />
+          <circle cx="626" cy="237" r="2.4" fill="#e6fff7" />
+          <ellipse cx="603" cy="264" rx="8" ry="6" fill="none" stroke="#4fd3b0" stroke-width="4" />
+          <!-- antenna, note -->
+          <path class="o" fill="none" d="M603 196 v-20" />
+          <circle class="o" cx="603" cy="170" r="8" fill="#4fd3b0" />
+          <path fill="none" stroke="#4fd3b0" stroke-width="2.5" stroke-linecap="round" d="M590 158 q-4 -6 0 -12 M616 158 q4 -6 0 -12" />
+          <g transform="rotate(14 648 208)"><rect class="t" x="638" y="200" width="18" height="14" rx="2" fill="#eceae2" /></g>
+        </g>
+
+        <!-- Pages in flight, with motion lines -->
+        <path d="M726 262 Q762 172 812 208" fill="none" stroke="#1d1d1f" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 10" />
+        <g transform="rotate(-18 742 206)">
+          <path class="o" d="M730 188 H748 L754 194 V218 H730 Z" fill="#fff" />
+        </g>
+        <g transform="rotate(10 786 182)">
+          <path class="o" d="M774 164 H792 L798 170 V194 H774 Z" fill="#ffe3df" />
+        </g>
+        <path class="t" stroke-width="2" d="M716 214 l-12 4 M720 224 l-10 6 M762 170 l-12 0 M764 180 l-10 4" />
+
+        <!-- Cabinet: top face, pages filed into it, front, side -->
+        <path class="o" d="M770 240 L790 226 H930 L910 240 Z" fill="#fbdc7a" />
+        <g transform="rotate(-7 810 232)"><path class="o" d="M796 208 H818 L826 216 V248 H796 Z" fill="#ffd1cc" /></g>
+        <g transform="rotate(5 850 232)"><path class="o" d="M836 206 H858 L866 214 V246 H836 Z" fill="#cfe3f7" /></g>
+        <g transform="rotate(12 884 236)"><path class="o" d="M872 214 H892 L900 222 V250 H872 Z" fill="#dcefc8" /></g>
+        <path class="o" d="M910 240 L930 226 V388 L910 402 Z" fill="#dba93a" />
+        <path class="h" d="M910 240 L930 226 V388 L910 402 Z" />
+        <rect class="o" x="770" y="240" width="140" height="162" rx="6" fill="#f7c948" />
+        <path class="o" d="M770 294 h140 M770 348 h140" fill="none" />
+        <path class="h" d="M772 286 h136 v6 h-136 Z M772 340 h136 v6 h-136 Z M772 394 h136 v6 h-136 Z" />
+        <rect class="t" x="796" y="258" width="88" height="22" rx="3" fill="#fff" />
+        <rect class="t" x="796" y="312" width="88" height="22" rx="3" fill="#fff" />
+        <rect class="t" x="796" y="366" width="88" height="22" rx="3" fill="#fff" />
+        <rect class="o" x="826" y="283" width="28" height="6" rx="3" fill="#1d1d1f" />
+        <rect class="o" x="826" y="337" width="28" height="6" rx="3" fill="#1d1d1f" />
+        <rect class="o" x="826" y="391" width="28" height="6" rx="3" fill="#1d1d1f" />
+
+        <!-- Zee's speech bubble: the Undo last button -->
+        <g transform="translate(0 26)">
+          <path class="o" d="M520 216 L548 236 L522 236 Z" fill="#7fe0c4" />
+          <rect class="o" x="388" y="198" width="140" height="46" rx="23" fill="#7fe0c4" />
+          <path d="M521 217 L527 221 L522 235 Z" fill="#7fe0c4" />
+          <path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity="0.7" d="M404 212 q8 -6 20 -6" />
+        </g>
+      </g>
+
+      <g filter="url(#rough)" fill="#7fe0c4" stroke="#1d1d1f" stroke-width="2" stroke-linejoin="round">
+        <use href="#spark" transform="translate(944 212) scale(1)" />
+        <use href="#spark" transform="translate(752 250) scale(0.7)" fill="#f7c948" />
+      </g>
+
+      <g filter="url(#roughText)">
+        <text x="840" y="274" font-size="15" text-anchor="middle">Finance</text>
+        <text x="840" y="328" font-size="15" text-anchor="middle">Calendar</text>
+        <text x="840" y="382" font-size="15" text-anchor="middle">Quarantine</text>
+        <text x="458" y="255" font-size="22" text-anchor="middle">&#8630; Undo last</text>
+      </g>
     </svg>
-    <script>
-      // Seeded, so every render of the cover is the same picture.
-      let seed = 20261020;
-      const random = () => {
-        seed = (seed + 0x6d2b79f5) | 0;
-        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      };
-      const smooth = (a, b, x) => {
-        const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-        return t * t * (3 - 2 * t);
-      };
-
-      // Muted category colors; most documents stay neutral.
-      const kinds = ["#b8644a", "#c79a45", "#7d9c7f", "#6f8ea6"];
-      const svg = "http://www.w3.org/2000/svg";
-      const tiles = document.getElementById("tiles");
-      const W = 26, H = 34, dx = 40, dy = 48;
-      const rows = [14, 62, 110, 286, 334, 382]; // the band in the middle is left for the title
-
-      for (const y0 of rows) {
-        for (let c = 0; c < 25; c++) {
-          const x0 = 14 + c * dx;
-          const order = smooth(260, 760, x0);
-          if (random() > 0.55 + order * 0.45) continue; // the mess has gaps
-          if (y0 > 200 && x0 > 586 && x0 < 760) continue; // where Zee stands
-          const chaos = 1 - order;
-          const x = x0 + (random() - 0.5) * 70 * chaos;
-          let y = y0 + (random() - 0.5) * 60 * chaos;
-          // Keep the band around the title clear.
-          if (y0 < 200) y = Math.min(y, 128);
-          else y = Math.max(y, 272);
-          const angle = (random() - 0.5) * 70 * chaos;
-          // Sorted side: each run of columns is one kind. Messy side: any kind.
-          const kind = order > 0.6 ? kinds[Math.floor(c / 2) % kinds.length] : kinds[Math.floor(random() * kinds.length)];
-          const colored = random() < 0.3 + order * 0.62;
-
-          const g = document.createElementNS(svg, "g");
-          g.setAttribute("transform", `translate(${x} ${y}) rotate(${angle} ${W / 2} ${H / 2})`);
-          const rect = document.createElementNS(svg, "rect");
-          rect.setAttribute("width", W);
-          rect.setAttribute("height", H);
-          rect.setAttribute("rx", 4);
-          rect.setAttribute("fill", colored ? kind : "#232a2f");
-          rect.setAttribute("opacity", colored ? 0.9 : 1);
-          g.appendChild(rect);
-          for (const [ly, lw] of [[10, 14], [16, 16], [22, 10]]) {
-            const line = document.createElementNS(svg, "rect");
-            line.setAttribute("x", 6);
-            line.setAttribute("y", ly);
-            line.setAttribute("width", lw);
-            line.setAttribute("height", 2);
-            line.setAttribute("rx", 1);
-            line.setAttribute("fill", colored ? "#15191c" : "#3a444b");
-            line.setAttribute("opacity", colored ? 0.35 : 1);
-            g.appendChild(line);
-          }
-          tiles.appendChild(g);
-        }
-      }
-
-      // The scribble under the title straightens out as it moves right.
-      const points = [];
-      for (let x = 300; x <= 700; x += 4) {
-        const chaos = 1 - smooth(330, 620, x);
-        const y = 254 + chaos * (Math.sin(x * 0.085) * 8 + Math.sin(x * 0.23) * 3);
-        points.push(`${x},${y.toFixed(1)}`);
-      }
-      document.getElementById("line").setAttribute("d", "M" + points.join(" L"));
-    </script>
-    <canvas id="robot"></canvas>
-    <script type="module" src="../../app/ui/robot.js"></script>
   </body>
 </html>
