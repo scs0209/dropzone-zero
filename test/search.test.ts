@@ -42,6 +42,8 @@ describe("find by description", () => {
     assert.equal((await search(inbox, "that beach picture", embed, 1))[0]!.path, "IMG_0001.png");
     assert.equal((await search(inbox, "coffee receipt", embed, 1))[0]!.path, "Finance/Receipts/bluebird.txt");
     assert.equal((await search(inbox, "hotel", embed, 1))[0]!.path, "hotel.txt");
+    assert.deepEqual((await search(inbox, "hotel", embed)).map((h) => h.path), ["hotel.txt"], "only matches close to the best come back");
+    assert.deepEqual(await search(inbox, "tax return", embed), [], "nothing, when nothing matches");
   });
 
   it("reads only new or changed files, and forgets files that are gone", async () => {

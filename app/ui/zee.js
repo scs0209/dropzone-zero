@@ -404,8 +404,10 @@ $("find").addEventListener("submit", async (event) => {
   list.hidden = false;
   list.replaceChildren(Object.assign(document.createElement("li"), { className: "searching", textContent: "Looking…" }));
   try {
-    const { hits } = await call("POST", "/search", { query });
+    const { hits, indexing } = await call("POST", "/search", { query });
+    const note = indexing ? [Object.assign(document.createElement("li"), { className: "searching", textContent: "Still reading new files; results may grow." })] : [];
     list.replaceChildren(
+      ...note,
       ...(hits.length
         ? hits.map((hit) => {
             const li = document.createElement("li");

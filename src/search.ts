@@ -43,7 +43,8 @@ export function ollamaEmbed(host = process.env.OLLAMA_HOST ?? "http://127.0.0.1:
     const response = await fetch(`${host.replace(/\/+$/, "")}/api/embed`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model, input: texts }),
+      // Kept loaded for a while (Ollama's default is 5 minutes), so the next search does not wait for it.
+      body: JSON.stringify({ model, input: texts, keep_alive: "30m" }),
       signal: AbortSignal.timeout(120_000),
     });
     if (!response.ok) {
@@ -175,16 +176,23 @@ export async function search(inbox: string, query: string, embed: Embed, limit =
   if (entries.length === 0 || !query.trim()) return [];
   const [q] = await embed([asQuery(query.trim())]);
   const words = query.toLowerCase().split(/\W+/).filter((w) => w.length > 2);
-  return entries
+  const ranked = entries
     .map((e) => {
       // A small nudge when the question's words are in the file's name.
       const name = e.path.toLowerCase();
       const named = words.filter((w) => name.includes(w)).length / Math.max(1, words.length);
       return { path: e.path, score: cosine(q!, e.vector) + 0.05 * named, why: e.text.slice(0, 140) };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+  // Only what is close to the best match: a clear winner comes back alone, and nothing
+  // comes back when even the best is a poor match. (Measured on the demo set: right
+  // answers scored 0.39-0.70, the runner-up wrong ones at least 0.1 lower.)
+  const best = ranked[0]?.score ?? 0;
+  return ranked.filter((hit) => hit.score >= MIN_SCORE && hit.score >= best - CLOSE_TO_BEST).slice(0, limit);
 }
+
+const MIN_SCORE = 0.25;
+const CLOSE_TO_BEST = 0.08;
 
 /** A stable short id for a path, so the UI can ask to reveal a hit without sending a path back. */
 export function hitId(path: string): string {

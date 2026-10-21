@@ -353,11 +353,14 @@ export class Daemon {
       if (route === "POST /search") {
         const { query } = SearchBody.parse(body);
         if (!this.options.search) return send(res, 404, { error: "search is off" });
-        // Wait for a pass already under way, so a file that just arrived can be found.
-        await this.indexing;
+        // Searches what is indexed now, without waiting for a pass under way (a first pass
+        // over a big folder takes minutes); the answer says so if one is.
         const hits: SearchHit[] = await searchIndex(this.options.folder, query, this.options.search.embed, 5);
         this.found = new Map(hits.map((hit) => [hitId(hit.path), hit.path]));
-        return send(res, 200, { hits: hits.map((hit) => ({ id: hitId(hit.path), path: hit.path, why: hit.why, score: hit.score })) });
+        return send(res, 200, {
+          hits: hits.map((hit) => ({ id: hitId(hit.path), path: hit.path, why: hit.why, score: hit.score })),
+          indexing: this.indexing !== null,
+        });
       }
       if (route === "POST /reveal-found") {
         const { id } = FoundBody.parse(body);
