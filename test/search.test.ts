@@ -27,6 +27,8 @@ async function folder(): Promise<string> {
   await writeFile(join(inbox, "hotel.txt"), "Seaside hotel booking confirmation");
   // A tiny PNG: the vision model is asked to describe it.
   await writeFile(join(inbox, "IMG_0001.png"), Buffer.from("89504e470d0a1a0a0000000d4948445200000001000000010806000000", "hex"));
+  await mkdir(join(inbox, "Notely.app/Contents/MacOS"), { recursive: true });
+  await writeFile(join(inbox, "Notely.app/Contents/MacOS/notely"), "binary");
   await mkdir(join(inbox, ".dropzone"), { recursive: true });
   await writeFile(join(inbox, ".dropzone/journal.jsonl"), "");
   return inbox;
@@ -37,7 +39,8 @@ describe("find by description", () => {
     const inbox = await folder();
     const client = vision("A photo of a sunny beach with blue water.");
     const result = await updateIndex(inbox, { client, embed });
-    assert.equal(result.total, 3, "Dropzone Zero's own state is not indexed");
+    assert.equal(result.total, 4, "Dropzone Zero's own state is not indexed, and an app counts once");
+    assert.ok((await loadIndex(inbox)).some((e) => e.path === "Notely.app"));
     assert.equal(client.calls, 1, "only the image goes to the vision model");
     assert.equal((await search(inbox, "that beach picture", embed, 1))[0]!.path, "IMG_0001.png");
     assert.equal((await search(inbox, "coffee receipt", embed, 1))[0]!.path, "Finance/Receipts/bluebird.txt");
@@ -57,6 +60,6 @@ describe("find by description", () => {
     await writeFile(join(inbox, "invoice.txt"), "Pixelwave invoice");
     const after = await updateIndex(inbox, { client, embed });
     assert.equal(after.indexed, 1);
-    assert.deepEqual((await loadIndex(inbox)).map((e) => e.path).sort(), ["Finance/Receipts/bluebird.txt", "IMG_0001.png", "invoice.txt"]);
+    assert.deepEqual((await loadIndex(inbox)).map((e) => e.path).sort(), ["Finance/Receipts/bluebird.txt", "IMG_0001.png", "Notely.app", "invoice.txt"]);
   });
 });

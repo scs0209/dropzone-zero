@@ -85,13 +85,17 @@ function titleOf(path: string): string {
   return basename(path, extname(path)).replace(/^\d{4}-\d{2}-\d{2}-?/, "").replace(/[-_]+/g, " ").trim() || basename(path);
 }
 
+const BUNDLE = /\.(app|bundle|framework|pkg|mpkg|photoslibrary|xcodeproj|key|pages|numbers)$/i;
+
 /** Every file worth finding: everything except Dropzone Zero's own state and hidden files. */
 async function filesIn(root: string, dir = root): Promise<string[]> {
   const found: string[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     if (entry.name.startsWith(".")) continue;
     const full = join(dir, entry.name);
-    if (entry.isDirectory()) found.push(...(await filesIn(root, full)));
+    // An app or other macOS bundle is one thing to find, not hundreds of files inside it.
+    if (entry.isDirectory() && BUNDLE.test(entry.name)) found.push(relative(root, full));
+    else if (entry.isDirectory()) found.push(...(await filesIn(root, full)));
     else if (entry.isFile() && extname(entry.name).toLowerCase() !== ".ics") found.push(relative(root, full));
   }
   return found;
@@ -127,6 +131,13 @@ export async function updateIndex(inbox: string, { client, embed, onProgress }: 
   const todo: { path: string; stamp: string }[] = [];
   for (const path of paths) {
     const info = await stat(join(inbox, path));
+    if (info.isDirectory()) {
+      // A bundle: found by its name alone.
+      const old = known.get(path);
+      if (old) kept.push(old);
+      else todo.push({ path, stamp: "bundle" });
+      continue;
+    }
     const stamp = `${info.size}:${Math.round(info.mtimeMs)}`;
     const old = known.get(path);
     if (old && old.stamp === stamp) kept.push(old);
@@ -136,8 +147,8 @@ export async function updateIndex(inbox: string, { client, embed, onProgress }: 
   for (const [i, { path, stamp }] of todo.entries()) {
     const full = join(inbox, path);
     const ext = extname(path).toLowerCase();
-    const size = (await stat(full)).size;
-    const content = await extractContent({ name: basename(path), path: full, ext, size, modifiedAt: new Date(), ageDays: 0, sha256: "", partial: false, executable: false }).catch(() => null);
+    const size = stamp === "bundle" ? 0 : (await stat(full)).size;
+    const content = stamp === "bundle" ? null : await extractContent({ name: basename(path), path: full, ext, size, modifiedAt: new Date(), ageDays: 0, sha256: "", partial: false, executable: false }).catch(() => null);
     let kind: IndexEntry["kind"] = "other";
     let text = "";
     if (content?.image) {
