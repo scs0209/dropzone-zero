@@ -77,7 +77,7 @@ An agent that renames and moves my files is a different risk from a chatbot. The
 |---|---|---|
 | `ALLOW` | A move inside the folder, classified with confidence 0.5 or more, not a program; empty files, duplicates (same SHA-256 as an older copy), and temp files going to quarantine | Runs on its own, even in `dz watch --auto` |
 | `REVIEW` | No valid answer after a retry; confidence below 0.5; a program or installer (by extension or execute bit); a move TabPFN expects me to undo; more than 20 new moves at once (one approval for the batch) | Waits for me in Zee, the terminal, or on my phone |
-| `BLOCK` | A download still in progress; a target outside the folder; a source that isn't a plain file in it; a change of file type; a symbolic link anywhere on the path | Never runs, whatever anyone approves |
+| `BLOCK` | A download still in progress; a target outside the folder; a source that isn't a plain file in it; a change of file type; a move into a hidden folder; a symbolic link anywhere on the path | Never runs, whatever anyone approves |
 
 The harness is the code that touches the disk, and it trusts nothing before it, not even its own plan. It judges each move again with real paths, moves a file only if its hash still matches the preview, never overwrites, and journals every rename before and after (a laptop lid can close halfway through). Undo reads that journal, so it puts back exactly what moved and refuses to touch a file I've edited since. None of this makes the model smarter. It makes its mistakes cheap: a wrong guess becomes a file in the wrong folder that one click puts back, never a lost file. A `.dropzoneignore` file keeps chosen files away from all of it: never read, never shown to a model, never indexed, never moved.
 
@@ -91,13 +91,14 @@ I built Zee with [Tauri](https://tauri.app) rather than Electron. Zee is a windo
 
 ### What daily use broke
 
-The unit tests (136 of them now) kept passing while most of these bugs were live. Using the app is what found them:
+The unit tests (142 of them now) kept passing while most of these bugs were live. Using the app is what found them:
 
 - **39 of 55 files filed as "other".** Previewing my own Downloads (counts only), the first category list was too narrow. Adding documents, spreadsheets, presentations, and images brought "other" down to 8.
 - **Two watchers racing.** A `dz watch` left running in a terminal moved a new download first; Zee's daemon then failed with "File is gone" and never showed the move. Now a lock allows one watcher per folder.
 - **A backlog blocking everything.** With more than 20 old files in Downloads, `--auto` hit the bulk limit on every pass and moved nothing, not even a fresh download. Now old files are left alone, not even sent to the model, and new ones go through.
 - **An undo button that did nothing.** It asked "Are you sure?" with `window.confirm()`, and the macOS WebView Tauri uses never shows that dialog: `confirm()` quietly returned `false`. The button now asks inside itself: "Put back?", then a second click.
 - **An undo that undid itself.** A file put back in Downloads looked like a new download, and the watcher filed it again seconds later. Now it remembers what an undo put back, and forgets once the file leaves, so a real re-download still gets filed. That last part I only found by doing it by hand.
+- **Rules only I could change.** "Rules I decide once" lived in a table in the code, so changing where receipts go meant editing TypeScript. Now a `.dropzonerules.json` in the folder sets any kind's folder and name, such as `{ "receipt": { "folder": "Money/Receipts/{year}", "name": "{title}-{date}" } }`. A rule only picks a path: the guard still judges every move, and a rule that points outside the folder or into a hidden one stops the run with a message instead of being quietly ignored.
 - **Bills I still forgot.** Filing an invoice doesn't pay it, so invoices, bookings, and warranties now get a calendar event in `Calendar/Follow-ups` ("Pay: …" a day before the due date), read from the text next to "Due date" or "Pay by", since the date Gemma picks for an invoice is the day it was issued. Taking an event back out failed at first, `removed: 0`: Calendar gives an imported event a new UID. It keeps the notes, so events now carry a "Dropzone Zero ID" line there.
 - **Files I couldn't find.** Zee got a search box: describe a file ("photo of a receipt from a market") and Gemma's image descriptions plus [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) vectors find it. On my real folder it first answered everything with five results, and listed unrelated photos (0.31) for a photo I don't own. The demo's right answers had scored 0.39 and up, so a 0.35 floor fixed it.
 
