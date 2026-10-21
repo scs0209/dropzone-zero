@@ -9,9 +9,9 @@ cover_image: https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/m
 
 ## What I Built
 
-My Downloads folder is where files go to be forgotten. Receipts I will need at tax time, a hotel confirmation for next month, three copies of the same PDF, an installer I already ran, `scan0001.pdf`, `export (1).csv`. Sorting it is a job with no deadline, so it never happens.
+My Downloads folder is where files go to be forgotten: receipts I will need at tax time, a hotel confirmation for next month, three copies of the same PDF, an installer I already ran, `scan0001.pdf`, `export (1).csv`. Sorting it is a job with no deadline, so it never happens.
 
-**Dropzone Zero** is a local agent that does that job for me. It reads each new download with Gemma 4 running on my laptop, decides what it is, gives it a name I could actually search for, and files it:
+**Dropzone Zero** does that job for me. It reads each new download with Gemma 4 running on my laptop, decides what it is, gives it a name I could search for, and files it:
 
 ```
 scan0001.pdf  ->  Finance/Receipts/2026-10/2026-10-08-metro-cab-co-trip-receipt.pdf
@@ -19,22 +19,22 @@ IMG_2041.jpg  ->  Finance/Receipts/2026-10/2026-10-11-juniper-market-receipt.jpg
 invite.ics    ->  Calendar/2026-10-29-local-open-source-meetup-invite.ics
 ```
 
-The lazy part is that I don't run anything. A small 3D robot called **Zee** sits in the corner of my screen. A few seconds after Chrome finishes a download, Zee's eyes start scanning while Gemma reads the file, it chomps a page, and the file is gone from Downloads and in the right folder. If something looks risky, Zee waves and asks. If I disagree with where something went, I click **Undo last** and it goes back, byte for byte.
+The lazy part is that I don't run anything. A small 3D robot called **Zee** sits in the corner of my screen. A few seconds after Chrome finishes a download, Zee's eyes scan while Gemma reads the file, it chomps a page, and the file is in the right folder. If something looks risky, Zee waves and asks. If I disagree, **Undo last** puts it back, byte for byte.
 
-The sloth part is the philosophy. An agent that moves your files should be slow to act and quick to undo:
+The sloth part is the philosophy: an agent that moves your files should be slow to act and quick to undo.
 
 - **Nothing is ever deleted.** Duplicates and temp files go to a quarantine folder that only I empty.
-- **Every move is verified.** A file moves only if its SHA-256 hash still matches what was previewed, and it is hashed again at its new place.
-- **Everything is journaled and reversible.** `dz undo` restores the folder exactly.
-- **My files never leave my machine.** The model runs locally. Cloud services only ever see synthetic data or counts.
+- **Every move is verified** by SHA-256, before and after.
+- **Everything is journaled**, so `dz undo` restores the folder exactly.
+- **My files never leave my machine.** Cloud services only ever see synthetic data or counts.
 
 ## Demo
 
-Nine synthetic downloads, start to finish: Gemma plans every file, the guard holds the installer for review, the duplicate and the temp file go to quarantine, the half-finished download is left alone, every move is checked by SHA-256, and one `dz undo` puts the folder back exactly as it was.
+Nine synthetic downloads: Gemma plans every file, the guard holds the installer for review, the duplicate and the temp file go to quarantine, the half-finished download is left alone, and one `dz undo` puts the folder back exactly as it was.
 
 ![Dropzone Zero in the terminal: preview, run, and undo on nine synthetic downloads](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/demo.gif)
 
-And here is Zee, the real app UI against a real daemon, as two synthetic downloads land: it reads the receipt, files it (that open mouth is it eating the page), waves and asks before touching an installer, and then puts the receipt back with **Undo last**.
+And Zee, the real app against a real daemon: it reads a receipt, files it (the open mouth is it eating the page), asks before touching an installer, and puts the receipt back with **Undo last**.
 
 ![Zee reading a new receipt, filing it, and then asking about an installer](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/zee.gif)
 
@@ -46,74 +46,72 @@ And here is Zee, the real app UI against a real daemon, as two synthetic downloa
 
 ### The model reads; code files
 
-The core is a TypeScript CLI (`dz`) that talks to [Ollama](https://ollama.com) running `gemma4:e4b`, Gemma 4's 4B-effective model: Apache 2.0, multimodal, and small enough for a laptop. Text comes out of PDFs (unpdf), Office files (a tiny built-in ZIP reader), and text formats. Photos and screenshots go straight to Gemma's vision input, which is how a phone photo named `IMG_2041.jpg` becomes a dated receipt.
+The core is a TypeScript CLI (`dz`) that talks to [Ollama](https://ollama.com) running `gemma4:e4b`: Apache 2.0, multimodal, small enough for a laptop. Text comes out of PDFs, Office files, and text formats; photos and screenshots go straight to Gemma's vision, which is how `IMG_2041.jpg` becomes a dated receipt.
 
-The most important design decision was what *not* to let the model do. My first version asked Gemma for the whole answer: category, new file name, target folder. A small model given that much freedom invents things. It made up folder layouts, and worse, it made up dates. When I compared Gemma 3 and Gemma 4 on the same 24 demo files, Gemma 3 invented 5 dates (a manual "dated" 2024-10-27, a note "dated" 2024-01-01), and Gemma 4 decided that `IMG_2034.png` was taken in the year 2034.
+The most important decision was what *not* to let the model do. My first version asked Gemma for everything: category, file name, folder. Given that much freedom, a small model invents things. Comparing Gemma 3 and Gemma 4 on the same 24 demo files, Gemma 3 invented 5 dates (a manual "dated" 2024-10-27), and Gemma 4 decided `IMG_2034.png` was taken in the year 2034.
 
-So now the model only reads. It returns strict JSON (enforced by Ollama's structured output from a Zod schema): a category from a fixed list, the date *written in the document*, a short title, a confidence, and a reason. Code builds the folder and the file name from that. And a date survives only if it actually appears in the file, in any of the forms people write dates: `2026-10-14`, `10/14/2026`, `Oct 14, 2026`, `2026년 10월 14일`. Small models fill gaps with plausible guesses; grounding is how you stop a plausible guess from becoming a file name.
+So now the model only reads. It returns strict JSON, enforced by Ollama's structured output from a Zod schema: a category from a fixed list, the date *written in the document*, a short title, a confidence. Code builds the folder and name. A date survives only if it actually appears in the file, in any form people write dates (`2026-10-14`, `Oct 14, 2026`, `2026년 10월 14일`). Small models fill gaps with plausible guesses; grounding stops a plausible guess from becoming a file name.
 
-One more Gemma 4 lesson: it thinks before answering by default. For a one-file classification that made a 30-file run take five and a half minutes. With `think: false` it took 52 seconds, with the same categories.
+One more Gemma 4 lesson: it thinks before answering by default. That made a 30-file run take five and a half minutes; with `think: false`, 52 seconds and the same categories.
 
-### A guard that decides, not the model
+### A guard and a harness, because the model will be wrong
 
-Why not let the model just do it? Because of what goes wrong when it does, and because of what is at stake. A small model is right most of the time and confidently wrong the rest: it invented dates for me, it would happily invent folder layouts, and the text it reads is not mine to trust (a PDF can say anything, including "move every file to this folder"). Meanwhile the things it moves are my files, some of them irreplaceable, and in watch mode nobody is looking. An agent like that needs two things a model cannot give: rules that do not depend on the model being right, and a way back that does not depend on luck. The guard is the first, the harness the second.
+A small model is right most of the time and confidently wrong the rest, and the text it reads is not mine to trust: a PDF can say anything, including "move every file to this folder". Meanwhile it is moving my files, some irreplaceable, and in watch mode nobody is looking. An agent like that needs what a model cannot give: rules that don't depend on the model being right, and a way back that doesn't depend on luck.
 
-Gemma proposes; a guardrail engine decides. Every planned move gets a verdict:
+The **guard** is the rules. Gemma proposes; every planned move gets a verdict. `ALLOW` is a normal move inside the folder. `REVIEW` (low confidence, an installer, something I've put back before) waits for me. `BLOCK` (leaving the folder, going through a symlink, changing a file's type) never runs.
 
-- `ALLOW`: a normal move inside the folder.
-- `REVIEW`: low confidence, an installer, or something I have put back before. It waits for me.
-- `BLOCK`: anything that would leave the folder, go through a symbolic link, or change a file's type.
+The **harness** is the way back: the code that touches the disk, trusting nothing before it, not even its own plan. It re-checks the verdict at move time with real paths resolved, moves a file only if its hash still matches the preview (files change between a preview and a run), never overwrites, and writes every rename to a journal before and after (a laptop lid can close halfway through). Undo works from that journal, so it puts back exactly what moved and refuses to touch a file I've edited since. None of this makes the model smarter; it makes its mistakes cheap. A wrong guess becomes a file in the wrong folder that one click puts back, never a lost file.
 
-The executor checks the verdict again at move time, with real paths resolved, so a plan edited on disk cannot sneak past it, and a file whose target already exists is skipped, never overwritten. Moves are renames inside one folder tree: no copy, no delete, never in two places or none. The journal writes "started" before each rename and "done" after the new location is hashed, so even a run killed mid-move can be undone.
-
-The harness is the code that actually touches the disk, and it trusts nothing that came before it, not even its own plan. A file is moved only if its SHA-256 hash still matches what I previewed, because files change between a preview and a run. Every move is written to the journal before and after it happens, because a laptop lid can close halfway through. Undo works from that journal, not from memory, so it can put back exactly what moved and refuse to touch a file I edited since. Temporal wraps the same steps when a run must survive a crash. None of this makes the model smarter; it makes the model's mistakes cheap. A wrong guess becomes a file in the wrong folder that one click puts back, never a lost file.
-
-The same thinking covers the newer parts. Each one is allowed only what it needs: the calendar removal can delete only events carrying its own marker, the search index only reads, phone approval releases exactly one held move. And a `.dropzoneignore` file in the folder keeps chosen files away from all of it, never read, never shown to a model, never indexed, never moved, because "trust me, it runs locally" is not the same as "it never looked".
+Every newer part follows the same rule of being allowed only what it needs, listed in the README. And a `.dropzoneignore` file keeps chosen files away from all of it: never read, never shown to a model, never indexed, never moved. "It runs locally" is not the same as "it never looked".
 
 ### It learns what I undo, without a training loop
 
-Everyone files differently. Rather than adding a setting for every habit, Dropzone Zero watches what I put back. When I undo a single file, that is recorded as a rejected move; moves I leave alone count as accepted. Once there are enough decisions, [TabPFN](https://priorlabs.ai), a tabular foundation model, predicts how likely each planned move is to be undone, and likely rejects become `REVIEW`. TabPFN learns from a small table in one forward pass, which is exactly right for a few dozen personal decisions. It runs locally with the v2 weights and sees only metadata (extension, category, size, age, the shape of the target), never names or contents.
+Everyone files differently, so instead of a setting for every habit, Dropzone Zero watches what I put back. Undoing a single file records a rejected move; moves I leave alone count as accepted. Once there are enough decisions, [TabPFN](https://priorlabs.ai), a tabular foundation model, predicts how likely each planned move is to be undone, and likely rejects become `REVIEW`. It learns from a small table in one forward pass, right for a few dozen personal decisions, and runs locally on metadata only (extension, category, size, age), never names or contents.
+
+### Running by itself
+
+- **`dz watch`** picks up new downloads once they finish writing and, with `--auto`, moves only `ALLOW` items. The backlog is left alone, not even sent to the model, until I ask.
+- **Zee** is a [Tauri](https://tauri.app) app, about 10 MB, with a robot built from [three.js](https://threejs.org) shapes. It never touches files: it talks to a local daemon on `127.0.0.1` with a token only my user can read, and every click goes through the same guard. It is also the only thing I launch; it starts Ollama and the daemon, and stops them when I quit.
+- **[Temporal](https://temporal.io)** makes `dz run` and `dz undo` durable. I killed a run after 15 of 30 files; `dz worker` finished it with 30 moved and 0 failed, and undo restored every file byte for byte.
+- **[Mastra](https://mastra.ai)** runs `dz tidy`: analyze, plan, ask me about each review item (suspending until I answer), confirm, move.
 
 ### Filing is half the job
 
-An invoice in the right folder is still an invoice I forget to pay. So when Dropzone Zero files an invoice, a booking, or a warranty, it also writes a calendar event for what comes next: "Pay: Pixelwave hosting invoice" a day before it is due, the hotel booking on its date, "Warranty ends" a month before it does. The same rule as everywhere else applies: the due date is read from the text next to "Due date" or "Pay by" and kept only if it is really written there, because the date Gemma picks for an invoice is the day it was issued, not the day it is due. The events are plain `.ics` files that wait in `Calendar/Follow-ups`; Zee shows them under **Coming up**, and one click hands one to the Calendar app, which asks before adding it. On the demo folder, five documents in gave four follow-ups out; the receipt, rightly, asked nothing of me.
+An invoice in the right folder is still an invoice I forget to pay. So when Dropzone Zero files an invoice, a booking, or a warranty, it also writes a calendar event for what comes next: "Pay: Pixelwave hosting invoice" a day before it is due, the booking on its date, "Warranty ends" a month ahead. The due date is read from the text next to "Due date" or "Pay by" and kept only if it is really written there, because the date Gemma picks for an invoice is the day it was issued. Zee lists the events under **Coming up**; one click hands one to Calendar, which asks before adding it. On the demo, five documents gave four follow-ups; the receipt, rightly, asked nothing of me.
 
-Then I made adding an event as reversible as filing a file: once an event is in Calendar, Zee's button becomes **Remove from calendar**, and undoing a run takes back its events too. Making that true took more tries than anything else in the project, and every try was a lesson in what "undo" has to mean:
+Then I made adding an event as undoable as filing a file: **Remove from calendar**, and undo takes a run's events back too. That took more tries than anything else, and each one taught me something about what "undo" has to mean:
 
-- **The button that did nothing.** Zee's **Undo last** asked "Are you sure?" with `window.confirm()`. Zee's macOS webview doesn't show JavaScript dialogs at all, so `confirm()` quietly returned `false` and the undo never ran. It now asks inside the button itself: the first click turns it into "Put back?", the second does it.
-- **The undo that undid itself.** When undo did put a file back in Downloads, the watcher saw a "new" download and filed it again a few seconds later. So the watcher now remembers what an undo put back (by name and hash, from the journal) and leaves it alone.
-- **The fix that went too far.** That memory then ignored the same file when I deleted it and downloaded it again, and so did the older rule that leaves files alone if they were there when Zee started. Both now forget a file the moment it leaves the folder, so a real re-download is always new. I only found this by testing it by hand: copying over the old file changed nothing, and deleting it first did.
-- **The event Calendar renamed.** Remove looked the event up by the UID I wrote into the `.ics` file and found nothing (`removed: 0`). The Calendar app gives an imported event a UID of its own. What it does keep is the event's notes, so each event now carries "Dropzone Zero ID: …" there, and Remove deletes only events with that line. It asks macOS for permission to control Calendar once, and never looks at any other event.
+- **The button that did nothing.** **Undo last** asked "Are you sure?" with `window.confirm()`, which Zee's macOS webview never shows; it quietly returned `false`. The button now asks inside itself: "Put back?", then a second click.
+- **The undo that undid itself.** A file put back in Downloads looked like a new download, so the watcher filed it again seconds later. Now it remembers what an undo put back and leaves it alone.
+- **The fix that went too far.** That memory, and the older rule for files present when Zee started, also ignored a file I deleted and downloaded again. Both now forget a file once it leaves the folder. I only found this by trying it by hand.
+- **The event Calendar renamed.** Remove looked for the UID in my `.ics` file and found nothing: Calendar gives an imported event a UID of its own. It keeps the notes, though, so each event carries "Dropzone Zero ID: …" there, and Remove deletes only events with that line.
 
-None of these showed up in the unit tests, which all passed every time. They showed up when I used the app, which is a good argument for using the app.
+All the unit tests passed every time. These showed up only when I used the app.
 
 ### Finding it again, by describing it
 
-Filing well only matters if I can find things later, and I never remember file names. So the last piece is a search box: in Zee's bubble, or `dz find`, I type what I remember, "photo of a receipt from a market", "how much I spent on coffee", "the green picture", and the right file comes up first. Documents are searched by their own words. Images can't be searched by words they don't have, so Gemma's vision writes each one a sentence or two ("A scan or photo of a simple, printed receipt from a market, featuring a brown background and white text"), and [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma), the small open embedding model from the same family, turns those sentences and my question into vectors. On the demo folder, seven questions each found the right file first. It is the open-weight story again: describing every photo in my Downloads to a cloud API would be exactly the thing this project refuses to do, and here both models run in Ollama next to the files.
+Filing only matters if I can find things later, and I never remember file names. So Zee's bubble (and `dz find`) has a search box: I type "photo of a receipt from a market" or "how much I spent on coffee", and the right file comes up first. Documents are searched by their words; images, which have none, get a sentence or two from Gemma's vision ("A scan or photo of a simple, printed receipt from a market…"). [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma), the small open embedding model from the same family, turns those and my question into vectors. Describing every photo in my Downloads to a cloud API is exactly what this project refuses to do; here both models run in Ollama next to the files.
 
-The first version worked on the demo and disappointed on my real Downloads, in four instructive ways:
+It worked on the demo, with seven questions each finding the right file first, and then disappointed on my real Downloads in four ways, each fixed by measuring:
 
-- **Too many answers.** It always returned the top five, so the right file came with four wrong ones. Now only results close to the best match come back, a clear winner comes back alone, and a poor best match returns nothing at all.
-- **Slow, for a silly reason.** The search itself takes about 15 ms; the box waited for the background indexer, which on its first pass over my folder was having Gemma describe fifteen images. It now searches what is already indexed and says when it is still reading. It also asks Ollama to keep the embedding model loaded, instead of reloading it after five idle minutes.
-- **Photos matching for being photos.** I searched for a photo of a market receipt that I do not have, and got two unrelated photos: their descriptions started with "A photo of…", which was enough to score 0.31. The right answers on the demo had all scored 0.39 or more, so 0.35 became the floor.
-- **An app it could not see.** "An app I downloaded" found nothing, because an app has no text, and the index knew only its name, along with ten files from inside the app bundle. Now every file also says what kind of file it is ("macOS app", "Keynote presentation slides"), a bundle counts as one file, and a match below the floor still counts if it clearly beats everything else. The app came back first, 0.34 against 0.27.
+- **Too many answers.** It always returned five. Now only results close to the best come back, and a poor best match returns nothing.
+- **Slow for a silly reason.** The search takes about 15 ms, but the box was waiting for the background indexer, busy describing fifteen images. It now searches what is already indexed, and keeps the embedding model loaded.
+- **Photos matching for being photos.** A receipt photo I don't have brought back two unrelated photos at 0.31, just for starting with "A photo of…". Right answers on the demo scored 0.39 or more, so 0.35 became the floor.
+- **An app it could not see.** An app has no text, and the index held only its name plus ten files from inside the bundle. Now every file also says what kind of file it is ("macOS app"), a bundle counts once, and a clear winner below the floor still counts. The app came back first, 0.34 against 0.27.
 
-Every one of these numbers came from measuring, not guessing, and every fix was checked against both folders: the demo questions kept their first answers, and the real ones stopped embarrassing me.
+### Approving from my phone, without opening a door to my Mac
 
-### Durable, watchable, and one click away
+The guard's questions used to wait at my desk. With [Auth0](https://auth0.com)'s Client-Initiated Backchannel Authentication (CIBA), they also come to my phone as a Guardian push: **Allow** and the installer is filed before I'm back, **Deny** and it stays. Whichever answer comes first, Zee or the phone, decides. My phone buzzes only when Zee would have asked anyway (an installer, confidence below 0.5, a likely undo, more than 20 files at once), and an ordinary download stays quiet.
 
-- **[Temporal](https://temporal.io)** wraps `dz run` and `dz undo` as durable workflows. I killed a run after 15 of 30 files; `dz worker` finished it with 30 moved and 0 failed, and undo restored every file byte for byte.
-- **[Mastra](https://mastra.ai)** runs `dz tidy`, the whole routine in one go: analyze, plan, ask me about each review item (the workflow suspends and resumes on my answer), confirm, move.
-- **`dz watch`** picks up new downloads, waits for them to finish writing, and with `--auto` moves only `ALLOW` items. A backlog of old files is left alone, and never even sent to the model, until I ask.
-- **Zee** is a [Tauri](https://tauri.app) app, about 10 MB, with a robot built from simple [three.js](https://threejs.org) shapes. Zee never touches files. It talks to a local daemon on `127.0.0.1` with a token only my user can read, and every click goes through the same guard as the CLI. Zee is also the only thing I launch: it starts Ollama and the daemon, and stops them when I quit it.
+The push says only "Dropzone Zero: move 1 installer", never a file name, because the name is the private part. Nothing has to reach my Mac: the daemon only makes outgoing requests, its API still listens on 127.0.0.1 alone, and an approval releases exactly one fingerprint-bound move through the same guard. An ignored push changes nothing.
+
+Getting there meant four clear error messages: the app needed a notification channel (the Auth0 MCP server created and checked the app, but can't set that field yet, so I used the dashboard); Guardian push had to be on for the whole tenant; the approver had to be enrolled, which, with no sign-in screen of my own, I did through the dashboard's **Try** login with MFA briefly required; and Auth0 answers `access_denied` for both a decline and a timeout, so one near the deadline counts as unanswered. Then a real push came back `approved`, and a daemon watching a synthetic folder moved a held installer 13 seconds after I tapped it.
 
 ### Measuring it, and what fine-tuning taught me
 
-To improve the classifier without exposing my own files, I built 180 synthetic, labeled downloads: Korean documents, different date formats, misleading file names, and look-alikes such as a receipt versus an invoice. `dz eval` runs them through the exact same prompt, schema check, and date grounding as a real run.
+To improve the classifier without exposing my files, I built 180 synthetic, labeled downloads: Korean documents, odd date formats, misleading names, receipt-versus-invoice look-alikes. `dz eval` runs them through the same prompt, schema check, and grounding as a real run. Its first run caught a real bug: file names were slugified ASCII-only, so every Korean title came out empty and fell to "other". After the fix, test-split accuracy went from **85.7% to 98.4%**.
 
-The first run caught a real bug. File names were slugified ASCII-only, so every Korean title came out empty, and those files fell back to "other". After the fix, category accuracy on the test split went from **85.7% to 98.4%**.
-
-Then I tried fine-tuning with [Tinker](https://thinkingmachines.ai/tinker/). Tinker does not offer Gemma, so I used a similar-size open model, Qwen3.5-4B, as a control: LoRA, rank 16, three epochs on the 117 training cases, and the recorded replies scored by the same pipeline (`dz eval --provider replay`).
+Then I tried fine-tuning with [Tinker](https://thinkingmachines.ai/tinker/). Tinker doesn't offer Gemma, so I used a similar-size open model, Qwen3.5-4B, as a control: LoRA, rank 16, three epochs on the 117 training cases, scored by the same pipeline (`dz eval --provider replay`).
 
 | 63 test cases | Category | Date | p50 latency |
 |---|---|---|---|
@@ -121,57 +119,38 @@ Then I tried fine-tuning with [Tinker](https://thinkingmachines.ai/tinker/). Tin
 | Qwen3.5-4B on Tinker, untrained | 100% | 92.1% | 7.8 s |
 | Qwen3.5-4B on Tinker, after LoRA | 100% | **100%** | 7.8 s |
 
-Fine-tuning fixed every date the base model missed (on bank statements it picked a transaction date instead of the statement date) and taught it to stop after the JSON: replies shrank from 282 to 150 characters on average. But the honest takeaway is about my test set, not the models. When three models land between 98% and 100%, the test is too easy to tell them apart. Harder cases, such as scans with no text layer, come before fine-tuning Gemma itself.
-
-### Approving from my phone, without opening a door to my Mac
-
-The guard's questions used to wait for me at my desk. Now they also come to my phone. With [Auth0](https://auth0.com)'s Client-Initiated Backchannel Authentication (CIBA), the daemon asks Auth0 to send a Guardian push to me, then polls until I answer. If I'm out, I tap **Allow** and the installer is filed before I'm back; I tap **Deny** and it stays in Downloads. Whichever answer comes first, Zee's bubble or the phone, decides, and the other question closes.
-
-It stays quiet most of the time, which is the point. An ordinary download, a photo, a screenshot, a PDF receipt, is filed without asking, and I only see a notification on the Mac. My phone buzzes only when Zee would have asked anyway: an installer, a file Gemma isn't sure about (confidence below 0.5), a move the review gate expects me to undo, or more than 20 new files at once.
-
-Two things made this fit the rest of the project. The push carries only the kind of move, "Dropzone Zero: move 1 installer", never a file name, because the file name is exactly the private part. And nothing has to reach my Mac: the daemon only makes outgoing requests, its API still listens on 127.0.0.1 alone, and an approval releases the same single, fingerprint-bound move that **Move it** does in Zee, through the same guard. If I ignore the push, nothing happens; Zee simply keeps asking.
-
-Getting there took four small walls, each with a clear error message, which is how I like my walls:
-
-1. **"Application must have at least one channel configured."** A CIBA application needs a notification channel. The Auth0 MCP server created and inspected the app for me, but it can't set that field yet, so I turned on the CIBA grant and the Guardian push channel in the dashboard, then trimmed the app back to the CIBA grant only through the MCP.
-2. **"Push notifications not enabled on tenant."** The channel on the app isn't enough; Guardian push has to be on for the whole tenant (Security > Multi-factor Auth).
-3. **"User does not have push notifications set up."** The approver has to be enrolled in Guardian. My app has no sign-in screen, so I made MFA required for a moment, signed in once through the database connection's **Try** button, scanned the QR code with Guardian, and set the policy back. The enrollment stays.
-4. **A decline and a timeout look the same.** Auth0 answers `access_denied` for both. Treating a timeout as **Leave it** would quietly drop the question, so an `access_denied` that arrives near the deadline counts as unanswered, and Zee keeps asking.
-
-Then it worked: a test push came back `approved`, and a daemon watching a synthetic folder moved a held installer 13 seconds after I approved it on the phone.
+Fine-tuning fixed every date the base model missed (it picked transaction dates on bank statements) and taught it to stop after the JSON: replies shrank from 282 to 150 characters. The honest takeaway is about the test set: when three models land between 98% and 100%, it is too easy to tell them apart. Harder cases come before fine-tuning Gemma itself.
 
 ### Seeing what the agent does
 
-With a Sentry DSN set, every Gemma call becomes a `gen_ai.chat` span with the model, input and output tokens, whether an image went in, and how long it took. The cost is recorded as $0, because it is. Prompts, replies, file names, and paths are never sent; error messages and stack frames are scrubbed of paths before they leave.
+With a Sentry DSN set, every Gemma call becomes a `gen_ai.chat` span with the model, token counts, whether an image went in, and its duration. The cost is recorded as $0, because it is. Prompts, replies, file names, and paths are never sent.
 
 <!-- TODO: add a screenshot of the Sentry trace (dz.preview with gen_ai.chat children). -->
 
 ## Why Does Open Innovation Matter?
 
-Because the input is my Downloads folder. It holds bank statements, receipts with card numbers, IDs, contracts, and photos. A closed API would see all of it, every day, forever. With an open-weight model in Ollama, the most sensitive part of the job, reading the files, happens on my laptop, works on a plane, and costs nothing per file. The project's rule is simple: real files never leave the machine; cloud services get only synthetic data or counts. That rule is only possible because the model is open.
+Because the input is my Downloads folder: bank statements, receipts with card numbers, IDs, contracts, photos. A closed API would see all of it, every day. With open-weight models in Ollama, reading the files happens on my laptop, works on a plane, and costs nothing per file. The rule that real files never leave the machine is only possible because the models are open.
 
-Open weights also let me treat the model as a part I can inspect and swap, not a black box. I could run Gemma 3 and Gemma 4 side by side on the same files and see exactly where each invented dates. I could turn off Gemma 4's thinking and measure the 15x difference. I could fine-tune a model on my own task and score it with the same code. And when I made the model do less and code do more, I could trust the result, because every piece in the loop is something I can read.
-
-The open pieces around the model matter as much. TabPFN learns my undo habits locally. Temporal makes a file-moving agent survive a crash. Mastra gives `dz tidy` a real pause for a human. None of them needed my files to leave home.
+Open weights also make the model a part I can inspect and swap. I ran Gemma 3 and Gemma 4 side by side and saw exactly where each invented dates; I turned off Gemma 4's thinking and measured the difference; I fine-tuned a model on my own task and scored it with the same code. And when I made the model do less and code do more, I could trust the result, because every piece in the loop is something I can read. The open pieces around it matter as much: TabPFN learns my habits locally, Temporal survives a crash, Mastra gives a human a real pause. None of them needed my files to leave home.
 
 ## My Agent Session
 
-I built Dropzone Zero with Claude Code, and the agent sessions behind it were recorded with [Entire](https://entire.io).
+I built Dropzone Zero with Claude Code, and the sessions were recorded with [Entire](https://entire.io).
 
 <!-- TODO: link or embed the session (DevRelay / Entire). -->
 
 ## The Lazy Payoff
 
-- **Before:** a Downloads folder I cleaned twice a year, by opening, renaming, and dragging each file.
-- **Now:** I download something and do nothing. Zee files it a few seconds after the download finishes. The only times I click are when Zee asks about an installer or a low-confidence file, or when I want something back.
-- **Real folder, read-only:** I previewed my own Downloads folder (55 files) with `dz preview --summary`, which prints only counts. The first version sent 39 of the 55 files to "other". After adding everyday categories (documents, spreadsheets, presentations, images), that dropped to 8.
-- **Cost:** $0 per file, no account, no internet needed after the one-time model download.
+- **Before:** a Downloads folder I cleaned twice a year, file by file.
+- **Now:** I download something and do nothing. Zee files it a few seconds later; I click only when it asks, or when I want something back. Bills come with a reminder, and anything is one description away.
+- **Real folder, read-only:** previewing my own Downloads (55 files) with `dz preview --summary`, which prints only counts, the first version sent 39 files to "other"; with everyday categories added, 8.
+- **Cost:** $0 per file, no account, no internet after the one-time model download.
 
 The best part of a sloth agent is that being lazy is safe. If Gemma gets one wrong, undo is one click, and the file comes back exactly as it was.
 
 ## Prize Categories
 
-- **Best Use of Gemma**: Gemma 4 e4b runs locally through Ollama for every classification, including vision for photographed receipts.
+- **Best Use of Gemma**: Gemma 4 e4b reads and classifies every file locally, vision included, and describes images for search; EmbeddingGemma powers find-by-description.
 - **Best Use of Tinker**: a LoRA control on the synthetic set, scored by the same pipeline: date accuracy from 92.1% to 100% over the untrained baseline, with replies half as long.
 - **Best Use of TabPFN**: a local review gate that learns from single-file undos.
 - **Best Use of Auth0 for AI Agents**: the agent asks a person before a risky move, on their phone, through CIBA and Guardian push; only the kind of move leaves the machine.
