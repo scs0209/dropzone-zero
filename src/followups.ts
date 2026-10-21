@@ -9,12 +9,13 @@
 // grounded the same way when it was classified. Everything stays on this machine.
 
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { categoryOfTarget, isDateWritten, normalizeDate, type Category } from "./classify.js";
 import { contentKindOf, extractContent } from "./extract.js";
-import { Journal } from "./journal.js";
+import { execFile } from "node:child_process";
+import { Journal, readJournal } from "./journal.js";
 import type { PlanItem } from "./plan.js";
 
 export const FOLLOW_UP_DIR = "Calendar/Follow-ups";
@@ -27,6 +28,8 @@ export interface FollowUp {
   date: string;
   /** The filed document it came from, relative to the folder. */
   from: string;
+  /** The event's UID; the only key Dropzone Zero ever uses to find it in Calendar. */
+  uid: string;
 }
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
@@ -83,7 +86,7 @@ export function subjectOf(target: string): string {
 }
 
 /** What to remember for a filed document, or null when it asks nothing of you. */
-export function followUpFor(category: Category | null, target: string, text: string, today = new Date()): Omit<FollowUp, "file" | "from"> | null {
+export function followUpFor(category: Category | null, target: string, text: string, today = new Date()): Pick<FollowUp, "title" | "date"> | null {
   const subject = subjectOf(target);
   let event: { title: string; date: string | null } | null = null;
   if (category === "invoice") event = { title: `Pay: ${subject}`, date: labeledDate(text, DUE) };
@@ -100,19 +103,23 @@ const ALARM: Partial<Record<Category, string>> = { invoice: "-P1D", booking: "-P
 const icsText = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 
 /** An all-day event with a reminder, as an .ics file the Calendar app can import. */
+/** A stable UID for a follow-up, ending in @dropzone-zero so nothing else can match it. */
+export function eventUid(from: string, date: string): string {
+  return `${createHash("sha256").update(`${from}\n${date}`).digest("hex").slice(0, 24)}@dropzone-zero`;
+}
+
 export function toIcs(event: Omit<FollowUp, "file">, category: Category, now = new Date()): string {
   const day = event.date.replace(/-/g, "");
   const next = new Date(`${event.date}T00:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const uid = createHash("sha256").update(`${event.from}\n${event.date}`).digest("hex").slice(0, 24);
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Dropzone Zero//Follow-ups//EN",
     "CALSCALE:GREGORIAN",
     "BEGIN:VEVENT",
-    `UID:${uid}@dropzone-zero`,
+    `UID:${event.uid}`,
     `DTSTAMP:${stamp}`,
     `DTSTART;VALUE=DATE:${day}`,
     `DTEND;VALUE=DATE:${next.toISOString().slice(0, 10).replace(/-/g, "")}`,
@@ -159,7 +166,7 @@ export async function writeFollowUps(
     const event = followUpFor(category, move.to, text, today);
     if (!event) continue;
     const file = `${FOLLOW_UP_DIR}/${event.date}-${basename(move.to, extname(move.to)).replace(/^\d{4}-\d{2}-\d{2}-/, "")}.ics`;
-    const followUp = { ...event, file, from: move.to };
+    const followUp = { ...event, file, from: move.to, uid: eventUid(move.to, event.date) };
     if (!existsSync(join(inbox, file))) {
       // Folders made here are journaled like a run's own, so undo removes them when empty.
       for (const dir of ["Calendar", FOLLOW_UP_DIR]) {
@@ -168,9 +175,101 @@ export async function writeFollowUps(
         if (run) await new Journal(inbox, run).write({ op: "mkdir", dir });
       }
       await writeFile(join(inbox, file), toIcs(followUp, category, today));
-      if (run) await new Journal(inbox, run).write({ op: "followup", file, from: move.to });
+      if (run) await new Journal(inbox, run).write({ op: "followup", file, from: move.to, uid: followUp.uid });
     }
     written.push(followUp);
   }
   return written;
+}
+
+// Taking events back out of Calendar. Only events whose UID Dropzone Zero made
+// (…@dropzone-zero) are ever looked up, and only after the person added one from Zee.
+// The first time, macOS asks whether Zee may control Calendar.
+
+const OUR_UID = /^[0-9a-f]{24}@dropzone-zero$/;
+
+export type RemoveEvents = (uids: string[]) => Promise<number>;
+
+/** Deletes the events with these UIDs from every calendar; returns how many went. */
+export const removeFromCalendar: RemoveEvents = async (uids) => {
+  const ours = uids.filter((uid) => OUR_UID.test(uid));
+  if (ours.length === 0) return 0;
+  const list = ours.map((uid) => `"${uid}"`).join(", ");
+  const script = `tell application "Calendar"
+  set removed to 0
+  repeat with wanted in {${list}}
+    repeat with cal in calendars
+      set hits to (every event of cal whose uid is (wanted as text))
+      repeat with hit in hits
+        delete hit
+        set removed to removed + 1
+      end repeat
+    end repeat
+  end repeat
+  return removed
+end tell`;
+  const output = await new Promise<string>((resolve, reject) =>
+    execFile("osascript", ["-e", script], { timeout: 30_000 }, (error, stdout) => (error ? reject(error) : resolve(stdout))),
+  );
+  return Number(output.trim()) || 0;
+};
+
+/** Notes that a follow-up was sent to Calendar, under the run that wrote it. */
+export async function recordCalendarAdd(inbox: string, followUp: Pick<FollowUp, "file" | "uid">): Promise<void> {
+  const written = (await readJournal(inbox)).find((e) => e.op === "followup" && e.file === followUp.file);
+  await new Journal(inbox, written?.run ?? "calendar").write({ op: "calendar-add", file: followUp.file, uid: followUp.uid });
+}
+
+/** UIDs sent to Calendar and not taken back yet; with `run`, only that run's. */
+export async function addedToCalendar(inbox: string, run?: string): Promise<string[]> {
+  const added = new Set<string>();
+  for (const entry of await readJournal(inbox)) {
+    if (run && entry.run !== run) continue;
+    if (entry.op === "calendar-add") added.add(entry.uid);
+    if (entry.op === "calendar-remove") added.delete(entry.uid);
+  }
+  return [...added];
+}
+
+/** Takes these events back out of Calendar and journals it. */
+export async function takeBackFromCalendar(inbox: string, uids: string[], remove: RemoveEvents = removeFromCalendar): Promise<number> {
+  if (uids.length === 0) return 0;
+  const removed = await remove(uids);
+  const runs = new Map((await readJournal(inbox)).flatMap((e) => (e.op === "calendar-add" ? [[e.uid, e.run] as const] : [])));
+  for (const uid of uids) await new Journal(inbox, runs.get(uid) ?? "calendar").write({ op: "calendar-remove", uid, removed });
+  return removed;
+}
+
+/**
+ * The follow-ups still worth showing, newest first: written, still in
+ * Calendar/Follow-ups, not dismissed. So Zee's list survives a restart.
+ */
+export async function pendingFollowUps(inbox: string, limit = 10): Promise<(FollowUp & { added: boolean })[]> {
+  const entries = await readJournal(inbox);
+  const dismissed = new Set(entries.flatMap((e) => (e.op === "followup-dismissed" ? [e.file] : [])));
+  const added = new Set(await addedToCalendar(inbox));
+  const list: (FollowUp & { added: boolean })[] = [];
+  for (const entry of [...entries].reverse()) {
+    if (entry.op !== "followup" || !entry.uid || dismissed.has(entry.file) || list.some((f) => f.file === entry.file)) continue;
+    if (!existsSync(join(inbox, entry.file))) continue;
+    const date = basename(entry.file).slice(0, 10);
+    list.push({ file: entry.file, from: entry.from, uid: entry.uid, date, title: titleFromIcs(join(inbox, entry.file)) ?? subjectOf(entry.from), added: added.has(entry.uid) });
+    if (list.length >= limit) break;
+  }
+  return list;
+}
+
+function titleFromIcs(path: string): string | null {
+  try {
+    const summary = readFileSync(path, "utf8").match(/^SUMMARY:(.*)$/m)?.[1];
+    return summary ? summary.replace(/\\([,;\\])/g, "$1").replace(/\\n/g, " ").trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Notes that a follow-up was taken off Zee's list. */
+export async function recordDismissed(inbox: string, file: string): Promise<void> {
+  const written = (await readJournal(inbox)).find((e) => e.op === "followup" && e.file === file);
+  await new Journal(inbox, written?.run ?? "calendar").write({ op: "followup-dismissed", file });
 }

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { undoFiles, undoRun } from "../src/execute.js";
-import { firstDate, followUpFor, labeledDate, subjectOf, toIcs, writeFollowUps } from "../src/followups.js";
+import { addedToCalendar, firstDate, pendingFollowUps, recordDismissed, followUpFor, labeledDate, recordCalendarAdd, removeFromCalendar, subjectOf, takeBackFromCalendar, toIcs, writeFollowUps } from "../src/followups.js";
 import { Journal } from "../src/journal.js";
 
 const TODAY = new Date("2026-10-21T00:00:00Z");
@@ -47,7 +47,8 @@ describe("calendar follow-ups", () => {
   });
 
   it("writes a valid all-day event with a reminder", () => {
-    const ics = toIcs({ title: "Pay: Pixelwave, hosting; invoice", date: "2026-10-31", from: "Finance/Invoices/x.pdf" }, "invoice", TODAY);
+    const ics = toIcs({ title: "Pay: Pixelwave, hosting; invoice", date: "2026-10-31", from: "Finance/Invoices/x.pdf", uid: "0123456789abcdef01234567@dropzone-zero" }, "invoice", TODAY);
+    assert.match(ics, /UID:0123456789abcdef01234567@dropzone-zero\r\n/);
     assert.match(ics, /^BEGIN:VCALENDAR\r\n/);
     assert.match(ics, /DTSTART;VALUE=DATE:20261031\r\nDTEND;VALUE=DATE:20261101\r\n/);
     assert.ok(ics.includes("SUMMARY:Pay: Pixelwave\\, hosting\\; invoice\r\n"), "commas and semicolons are escaped");
@@ -99,5 +100,38 @@ describe("calendar follow-ups", () => {
     await undoRun(inbox, run);
     assert.ok(!existsSync(join(inbox, written[1]!.file)));
     assert.ok(existsSync(join(inbox, ".dropzone/quarantine/follow-ups", "2028-10-03-drill-warranty.ics")));
+  });
+
+  it("takes back only the events added from Zee, once, under the run that wrote them", async () => {
+    const inbox = await mkdtemp(join(tmpdir(), "dz-followups-cal-"));
+    await mkdir(join(inbox, "Finance/Invoices"), { recursive: true });
+    const to = "Finance/Invoices/2026-10-01-pixelwave-invoice.txt";
+    await writeFile(join(inbox, to), "Due date 2026-10-31");
+    const [followUp] = await writeFollowUps(inbox, [{ from: "i.txt", to }], [{ name: "i.txt", category: "invoice" }], TODAY, "run-1");
+    assert.match(followUp!.uid, /^[0-9a-f]{24}@dropzone-zero$/);
+    assert.match(await readFile(join(inbox, followUp!.file), "utf8"), new RegExp(`UID:${followUp!.uid}`));
+
+    assert.deepEqual(await addedToCalendar(inbox, "run-1"), [], "nothing added until the person clicks");
+    await recordCalendarAdd(inbox, followUp!);
+    assert.deepEqual(await addedToCalendar(inbox, "run-1"), [followUp!.uid]);
+    assert.deepEqual(await addedToCalendar(inbox, "run-2"), []);
+
+    const asked: string[][] = [];
+    const removed = await takeBackFromCalendar(inbox, [followUp!.uid], async (uids) => (asked.push(uids), uids.length));
+    assert.equal(removed, 1);
+    assert.deepEqual(asked, [[followUp!.uid]]);
+    assert.deepEqual(await addedToCalendar(inbox, "run-1"), [], "taken back once");
+
+    // What Zee lists after a restart comes from the journal.
+    const listed = await pendingFollowUps(inbox);
+    assert.deepEqual(listed.map((f) => [f.title, f.date, f.added]), [["Pay: Pixelwave invoice", "2026-10-31", false]]);
+    await recordCalendarAdd(inbox, followUp!);
+    assert.equal((await pendingFollowUps(inbox))[0]!.added, true);
+    await recordDismissed(inbox, followUp!.file);
+    assert.deepEqual(await pendingFollowUps(inbox), []);
+  });
+
+  it("never asks Calendar about an event it did not make", async () => {
+    assert.equal(await removeFromCalendar(["someone-elses-event", 'x" & do shell script "rm -rf ~', ""]), 0);
   });
 });

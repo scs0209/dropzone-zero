@@ -250,6 +250,10 @@ ul {
   cursor: pointer;
 }
 
+#coming button.added {
+  border-color: var(--line);
+  color: var(--muted);
+}
 #coming button.dismiss {
   border: none;
   padding: 2px 6px;

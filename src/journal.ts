@@ -17,9 +17,15 @@ export type JournalEntry = { run: string; at: string } & (
   | { op: "restore"; from: string; to: string; state: "done" | "failed"; error?: string }
   | { op: "rmdir"; dir: string }
   /** A calendar follow-up written for a filed document (see followups.ts). */
-  | { op: "followup"; file: string; from: string }
+  | { op: "followup"; file: string; from: string; uid?: string }
   /** An undo set a run's follow-up aside in quarantine. */
   | { op: "followup-aside"; file: string; to: string }
+  /** The person sent a follow-up to the Calendar app from Zee. */
+  | { op: "calendar-add"; file: string; uid: string }
+  /** Dropzone Zero removed its own event (by UID) from the Calendar app. */
+  | { op: "calendar-remove"; uid: string; removed: number }
+  /** Taken off Zee's "Coming up" list; the .ics file stays. */
+  | { op: "followup-dismissed"; file: string }
   | { op: "undo-end"; restored: number; failed: number }
 );
 

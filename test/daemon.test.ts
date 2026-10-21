@@ -106,6 +106,7 @@ describe("dz daemon API", () => {
     if (!listening) return t.skip("cannot bind a port here");
     assert.equal((await call("POST", "/calendar", { file: "../../etc/passwd" })).status, 404);
     assert.equal((await call("POST", "/dismiss", { file: "../../etc/passwd" })).status, 404);
+    assert.equal((await call("POST", "/calendar/remove", { file: "../../etc/passwd" })).status, 404);
     assert.deepEqual((await call("GET", "/state")).body.followUps, []);
   });
 

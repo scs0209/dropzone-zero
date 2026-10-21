@@ -9,7 +9,7 @@ import { z } from "zod";
 import { lastUndoableRun, undoRun } from "./execute.js";
 import { fingerprint } from "./guard.js";
 import { recentMoves, type RecentMove } from "./recent.js";
-import type { FollowUp } from "./followups.js";
+import { addedToCalendar, pendingFollowUps, recordCalendarAdd, recordDismissed, removeFromCalendar, takeBackFromCalendar, type FollowUp, type RemoveEvents } from "./followups.js";
 import type { RemoteApprover } from "./remote-approval.js";
 import { spokenQuestion, spokenSummary, type Voice } from "./voice.js";
 import { startWatching, type CycleResult, type WatchControl, type WatchOptions } from "./watch.js";
@@ -51,8 +51,8 @@ export interface DaemonState {
   pending: PendingDecision[];
   recent: RecentMove[];
   lastRun: { run: string; moved: number } | null;
-  /** Calendar follow-ups for what was filed, not yet added to a calendar. */
-  followUps: FollowUp[];
+  /** Calendar follow-ups for what was filed; `added` once sent to the Calendar app from Zee. */
+  followUps: (FollowUp & { added?: boolean })[];
 }
 
 export interface DaemonOptions extends Omit<WatchOptions, "auto" | "inbox"> {
@@ -69,6 +69,8 @@ export interface DaemonOptions extends Omit<WatchOptions, "auto" | "inbox"> {
   remoteApprover?: Pick<RemoteApprover, "ask"> | null;
   /** Zee says what it filed and when it needs an OK (ElevenLabs); kinds and counts only. */
   voice?: Pick<Voice, "say"> | null;
+  /** Deletes Dropzone Zero's own events (by UID) from the Calendar app; tests pass a fake. */
+  removeEvents?: RemoveEvents;
 }
 
 const DecideBody = z.object({ id: z.string().min(1), approve: z.boolean() });
@@ -93,7 +95,7 @@ export class Daemon {
   private pending: PendingDecision[] = [];
   private recent: RecentMove[] = [];
   private lastRun: DaemonState["lastRun"] = null;
-  private followUps: FollowUp[] = [];
+  private followUps: (FollowUp & { added?: boolean })[] = [];
   private lastMessage = "Watching for new downloads.";
   /** Questions also out on the approver's phone, so an answer in Zee can call them off. */
   private remote = new Map<string, AbortController>();
@@ -141,6 +143,7 @@ export class Daemon {
     await mkdir(dirname(infoPath), { recursive: true, mode: 0o700 });
     await writeFile(infoPath, JSON.stringify({ port: this.port, token: this.token, pid: process.pid, folder: this.options.folder }), { mode: 0o600 });
     this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
+    this.followUps = await pendingFollowUps(this.options.folder);
     await this.options.waitForModel();
     this.dizzy = null;
     this.startWatcher();
@@ -291,22 +294,37 @@ export class Daemon {
         if (!this.followUps.some((f) => f.file === file)) return send(res, 404, { error: "not a follow-up" });
         // The Calendar app opens the .ics and asks before adding the event.
         await new Promise<void>((ok, fail) => execFile("open", [join(this.options.folder, file)], (e) => (e ? fail(e) : ok())));
-        this.followUps = this.followUps.filter((f) => f.file !== file);
+        const followUp = this.followUps.find((f) => f.file === file)!;
+        followUp.added = true;
+        await recordCalendarAdd(this.options.folder, followUp);
         return send(res, 200, this.state());
+      }
+      if (route === "POST /calendar/remove") {
+        const { file } = CalendarBody.parse(body);
+        const followUp = this.followUps.find((f) => f.file === file && f.added);
+        if (!followUp) return send(res, 404, { error: "not added to the calendar from Zee" });
+        const removed = await takeBackFromCalendar(this.options.folder, [followUp.uid], this.options.removeEvents ?? removeFromCalendar);
+        followUp.added = false;
+        this.lastMessage = removed ? "Removed it from your calendar." : "It was not in your calendar.";
+        return send(res, 200, { ...this.state(), message: this.lastMessage });
       }
       if (route === "POST /dismiss") {
         const { file } = CalendarBody.parse(body);
         // Off the list only; the .ics file stays in Calendar/Follow-ups.
         if (!this.followUps.some((f) => f.file === file)) return send(res, 404, { error: "not a follow-up" });
         this.followUps = this.followUps.filter((f) => f.file !== file);
+        await recordDismissed(this.options.folder, file);
         return send(res, 200, this.state());
       }
       if (route === "POST /undo") {
         const run = await lastUndoableRun(this.options.folder);
         if (!run) return send(res, 200, { ...this.state(), message: "Nothing to undo." });
         const result = await undoRun(this.options.folder, run);
+        // Events this run's follow-ups put in the Calendar app come back out too.
+        const events = await addedToCalendar(this.options.folder, run);
+        const removed = await takeBackFromCalendar(this.options.folder, events, this.options.removeEvents ?? removeFromCalendar).catch(() => 0);
         this.recent = await recentMoves(this.options.folder, RECENT_LIMIT);
-        this.lastMessage = `Put back ${result.restored} ${result.restored === 1 ? "file" : "files"}.`;
+        this.lastMessage = `Put back ${result.restored} ${result.restored === 1 ? "file" : "files"}.${removed ? ` Removed ${removed} ${removed === 1 ? "event" : "events"} from your calendar.` : ""}`;
         return send(res, 200, this.state());
       }
       if (route === "POST /pause") {

@@ -22,7 +22,7 @@ import {
   type UndoResult,
 } from "./execute.js";
 import { contentKindOf, extractContent } from "./extract.js";
-import { writeFollowUps, type FollowUp } from "./followups.js";
+import { addedToCalendar, takeBackFromCalendar, writeFollowUps, type FollowUp } from "./followups.js";
 import { batchNeedsApproval, DEFAULT_BULK_LIMIT, fingerprint, isRunnable } from "./guard.js";
 import { acquireWatchLock, WatcherRunningError } from "./lock.js";
 import { notify } from "./notify.js";
@@ -693,6 +693,16 @@ async function undo(folder: string, yes: boolean, temporal: boolean, files: stri
   recordCounts("dz.undo", { restored: result.restored, failed: result.failed.length });
   console.log(`Undid run ${runId}: restored ${result.restored} files.`);
   printFailures(result.failed);
+  // Events from this run that were added to the Calendar app from Zee come back out too.
+  const events = await addedToCalendar(folder, runId);
+  if (events.length) {
+    try {
+      const removed = await takeBackFromCalendar(folder, events);
+      console.log(`Removed ${removed} of ${events.length} calendar ${events.length === 1 ? "event" : "events"} this run had added.`);
+    } catch (error) {
+      console.log(`Could not reach Calendar to remove ${events.length === 1 ? "an event" : `${events.length} events`}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 
 /** Finance/receipts-2026-10-20.csv, or -2, -3, ... so an export never overwrites an earlier one. */

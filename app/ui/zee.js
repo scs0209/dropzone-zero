@@ -119,11 +119,16 @@ function drawComing(followUps) {
         Object.assign(document.createElement("div"), { textContent: followUp.title }),
         Object.assign(document.createElement("div"), { className: "when", textContent: followUp.date }),
       );
-      const add = Object.assign(document.createElement("button"), { type: "button", textContent: "Add to calendar" });
+      // Once sent to Calendar, the same button takes the event back out (by its UID only).
+      const add = Object.assign(document.createElement("button"), {
+        type: "button",
+        textContent: followUp.added ? "Remove from calendar" : "Add to calendar",
+      });
+      add.classList.toggle("added", Boolean(followUp.added));
       add.onclick = async () => {
         add.disabled = true;
         try {
-          render(await call("POST", "/calendar", { file: followUp.file }));
+          render(await call("POST", followUp.added ? "/calendar/remove" : "/calendar", { file: followUp.file }));
         } catch (error) {
           add.disabled = false;
           showError(error);
