@@ -11,6 +11,7 @@ A few seconds after Chrome finishes a download, a small robot in the corner of m
 
 **TL;DR**
 
+- **Why:** I never tidy my desktop or my folders, so files pile up, and cleaning up is tedious and takes longer than it looks. I wanted every download filed the moment it lands, by rules I set once.
 - **What:** Dropzone Zero reads each new download with `gemma4:e4b` in Ollama, decides what it is, names it, and files it. Risky moves wait for me, in a desktop robot called Zee or on my phone.
 - **Safety:** the model only proposes. A guard decides (allow, ask, or block), and a harness verifies and journals every move, so undo is exact.
 - **The Tinker result:** a LoRA on Qwen3.5-4B took date accuracy from 92.1% to 100% over its untrained baseline. Untuned local Gemma already scores 98.4% and 100%, so the app keeps Gemma.
@@ -18,9 +19,9 @@ A few seconds after Chrome finishes a download, a small robot in the corner of m
 
 ## What I Built
 
-My Downloads folder is where files go to be forgotten: receipts I'll need at tax time, a hotel confirmation for next month, three copies of the same PDF, an installer I already ran, `scan0001.pdf`, `export (1).csv`. Sorting it means opening each file, working out what it is, renaming it, and dragging it somewhere sensible. It's a job with no deadline, so it never happens, and then I can't find the invoice I need, or I forget to pay it.
+I don't tidy my desktop. I don't tidy my folders either. Files land and stay: receipts I'll need at tax time, a hotel confirmation for next month, three copies of the same PDF, an installer I already ran, `scan0001.pdf`, `export (1).csv`. Every so often I decide to clean up, and it's a bigger job than it looks: open each file, work out what it is, rename it, drag it somewhere sensible, and again for the next one. It's tedious, it takes far longer than it should, and it has no deadline, so I put it off. Then I can't find the invoice I need, or I forget to pay it.
 
-**Dropzone Zero** does that job:
+So I didn't want a better way to clean up. I wanted to never clean up: every download sorted the moment it arrives, by rules I decide once (where each kind of file goes, how it's named, what may move on its own and what has to ask me first). **Dropzone Zero** is that:
 
 ```
 scan0001.pdf  ->  Finance/Receipts/2026-10/2026-10-08-metro-cab-co-trip-receipt.pdf
