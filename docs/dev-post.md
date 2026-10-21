@@ -56,6 +56,8 @@ One more Gemma 4 lesson: it thinks before answering by default. For a one-file c
 
 ### A guard that decides, not the model
 
+Why not let the model just do it? Because of what goes wrong when it does, and because of what is at stake. A small model is right most of the time and confidently wrong the rest: it invented dates for me, it would happily invent folder layouts, and the text it reads is not mine to trust (a PDF can say anything, including "move every file to this folder"). Meanwhile the things it moves are my files, some of them irreplaceable, and in watch mode nobody is looking. An agent like that needs two things a model cannot give: rules that do not depend on the model being right, and a way back that does not depend on luck. The guard is the first, the harness the second.
+
 Gemma proposes; a guardrail engine decides. Every planned move gets a verdict:
 
 - `ALLOW`: a normal move inside the folder.
@@ -63,6 +65,10 @@ Gemma proposes; a guardrail engine decides. Every planned move gets a verdict:
 - `BLOCK`: anything that would leave the folder, go through a symbolic link, or change a file's type.
 
 The executor checks the verdict again at move time, with real paths resolved, so a plan edited on disk cannot sneak past it, and a file whose target already exists is skipped, never overwritten. Moves are renames inside one folder tree: no copy, no delete, never in two places or none. The journal writes "started" before each rename and "done" after the new location is hashed, so even a run killed mid-move can be undone.
+
+The harness is the code that actually touches the disk, and it trusts nothing that came before it, not even its own plan. A file is moved only if its SHA-256 hash still matches what I previewed, because files change between a preview and a run. Every move is written to the journal before and after it happens, because a laptop lid can close halfway through. Undo works from that journal, not from memory, so it can put back exactly what moved and refuse to touch a file I edited since. Temporal wraps the same steps when a run must survive a crash. None of this makes the model smarter; it makes the model's mistakes cheap. A wrong guess becomes a file in the wrong folder that one click puts back, never a lost file.
+
+The same thinking covers the newer parts. Each one is allowed only what it needs: the calendar removal can delete only events carrying its own marker, the search index only reads, phone approval releases exactly one held move. And a `.dropzoneignore` file in the folder keeps chosen files away from all of it, never read, never shown to a model, never indexed, never moved, because "trust me, it runs locally" is not the same as "it never looked".
 
 ### It learns what I undo, without a training loop
 
@@ -84,6 +90,15 @@ None of these showed up in the unit tests, which all passed every time. They sho
 ### Finding it again, by describing it
 
 Filing well only matters if I can find things later, and I never remember file names. So the last piece is a search box: in Zee's bubble, or `dz find`, I type what I remember, "photo of a receipt from a market", "how much I spent on coffee", "the green picture", and the right file comes up first. Documents are searched by their own words. Images can't be searched by words they don't have, so Gemma's vision writes each one a sentence or two ("A scan or photo of a simple, printed receipt from a market, featuring a brown background and white text"), and [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma), the small open embedding model from the same family, turns those sentences and my question into vectors. On the demo folder, seven questions each found the right file first. It is the open-weight story again: describing every photo in my Downloads to a cloud API would be exactly the thing this project refuses to do, and here both models run in Ollama next to the files.
+
+The first version worked on the demo and disappointed on my real Downloads, in four instructive ways:
+
+- **Too many answers.** It always returned the top five, so the right file came with four wrong ones. Now only results close to the best match come back, a clear winner comes back alone, and a poor best match returns nothing at all.
+- **Slow, for a silly reason.** The search itself takes about 15 ms; the box waited for the background indexer, which on its first pass over my folder was having Gemma describe fifteen images. It now searches what is already indexed and says when it is still reading. It also asks Ollama to keep the embedding model loaded, instead of reloading it after five idle minutes.
+- **Photos matching for being photos.** I searched for a photo of a market receipt that I do not have, and got two unrelated photos: their descriptions started with "A photo of…", which was enough to score 0.31. The right answers on the demo had all scored 0.39 or more, so 0.35 became the floor.
+- **An app it could not see.** "An app I downloaded" found nothing, because an app has no text, and the index knew only its name, along with ten files from inside the app bundle. Now every file also says what kind of file it is ("macOS app", "Keynote presentation slides"), a bundle counts as one file, and a match below the floor still counts if it clearly beats everything else. The app came back first, 0.34 against 0.27.
+
+Every one of these numbers came from measuring, not guessing, and every fix was checked against both folders: the demo questions kept their first answers, and the real ones stopped embarrassing me.
 
 ### Durable, watchable, and one click away
 
