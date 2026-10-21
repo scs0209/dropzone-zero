@@ -420,7 +420,7 @@ $("find").addEventListener("submit", async (event) => {
             li.append(button);
             return li;
           })
-        : [Object.assign(document.createElement("li"), { className: "searching", textContent: "Nothing found." })]),
+        : [Object.assign(document.createElement("li"), { className: "searching", textContent: "Nothing matched well. Try other words." })]),
     );
   } catch (error) {
     list.replaceChildren(Object.assign(document.createElement("li"), { className: "searching", textContent: String(error.message ?? error) }));

@@ -185,13 +185,14 @@ export async function search(inbox: string, query: string, embed: Embed, limit =
     })
     .sort((a, b) => b.score - a.score);
   // Only what is close to the best match: a clear winner comes back alone, and nothing
-  // comes back when even the best is a poor match. (Measured on the demo set: right
-  // answers scored 0.39-0.70, the runner-up wrong ones at least 0.1 lower.)
+  // comes back when even the best is a poor match. Measured: on the demo set the right
+  // answers scored 0.39-0.70; on a real Downloads folder with no such file, unrelated
+  // photos scored up to 0.31 just for being photos.
   const best = ranked[0]?.score ?? 0;
   return ranked.filter((hit) => hit.score >= MIN_SCORE && hit.score >= best - CLOSE_TO_BEST).slice(0, limit);
 }
 
-const MIN_SCORE = 0.25;
+const MIN_SCORE = 0.35;
 const CLOSE_TO_BEST = 0.08;
 
 /** A stable short id for a path, so the UI can ask to reveal a hit without sending a path back. */
