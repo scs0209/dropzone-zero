@@ -135,7 +135,9 @@ A word on Tinker, because it surprised me. Fine-tuning had always sounded like a
 
 With a Sentry DSN set, every Gemma call is a `gen_ai.chat` span: model, token counts, whether an image went in, duration, and a cost of $0, because it is. Prompts, replies, file names, and paths are never sent.
 
-[이미지 삽입: 실제 Sentry 트레이스 — dz.preview 아래 gen_ai.chat 스팬들(모델 gemma4:e4b, 입력·출력 토큰, 소요 시간)이 보이는 대시보드 화면]
+Below is one preview of the 31 demo files: 25 model calls (rules decided the other six), and an empty Input tab, because no prompt is stored.
+
+![A Sentry trace of one dz.preview run on the synthetic demo files: 25 gen_ai.chat spans for gemma4:e4b, one selected with its token counts and no prompt stored](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/sentry-trace.png)
 
 ### What it can't do yet
 
