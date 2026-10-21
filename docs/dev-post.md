@@ -81,6 +81,10 @@ Then I made adding an event as reversible as filing a file: once an event is in 
 
 None of these showed up in the unit tests, which all passed every time. They showed up when I used the app, which is a good argument for using the app.
 
+### Finding it again, by describing it
+
+Filing well only matters if I can find things later, and I never remember file names. So the last piece is a search box: in Zee's bubble, or `dz find`, I type what I remember, "photo of a receipt from a market", "how much I spent on coffee", "the green picture", and the right file comes up first. Documents are searched by their own words. Images can't be searched by words they don't have, so Gemma's vision writes each one a sentence or two ("A scan or photo of a simple, printed receipt from a market, featuring a brown background and white text"), and [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma), the small open embedding model from the same family, turns those sentences and my question into vectors. On the demo folder, seven questions each found the right file first. It is the open-weight story again: describing every photo in my Downloads to a cloud API would be exactly the thing this project refuses to do, and here both models run in Ollama next to the files.
+
 ### Durable, watchable, and one click away
 
 - **[Temporal](https://temporal.io)** wraps `dz run` and `dz undo` as durable workflows. I killed a run after 15 of 30 files; `dz worker` finished it with 30 moved and 0 failed, and undo restored every file byte for byte.

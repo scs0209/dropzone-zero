@@ -10,7 +10,9 @@ import { lastUndoableRun, undoRun } from "./execute.js";
 import { fingerprint } from "./guard.js";
 import { recentMoves, type RecentMove } from "./recent.js";
 import { addedToCalendar, pendingFollowUps, recordCalendarAdd, recordDismissed, removeFromCalendar, takeBackFromCalendar, type FollowUp, type RemoveEvents } from "./followups.js";
+import type { ModelClient } from "./classify.js";
 import type { RemoteApprover } from "./remote-approval.js";
+import { hitId, search as searchIndex, updateIndex, type Embed, type SearchHit } from "./search.js";
 import { spokenQuestion, spokenSummary, type Voice } from "./voice.js";
 import { startWatching, type CycleResult, type WatchControl, type WatchOptions } from "./watch.js";
 
@@ -71,11 +73,15 @@ export interface DaemonOptions extends Omit<WatchOptions, "auto" | "inbox"> {
   voice?: Pick<Voice, "say"> | null;
   /** Deletes Dropzone Zero's own events (by UID) from the Calendar app; tests pass a fake. */
   removeEvents?: RemoveEvents;
+  /** Search by description: the local model for image captions and EmbeddingGemma for vectors. */
+  search?: { client: ModelClient; embed: Embed } | null;
 }
 
 const DecideBody = z.object({ id: z.string().min(1), approve: z.boolean() });
 const RevealBody = z.object({ to: z.string().min(1) });
 const CalendarBody = z.object({ file: z.string().min(1) });
+const SearchBody = z.object({ query: z.string().min(1).max(300) });
+const FoundBody = z.object({ id: z.string().min(1) });
 
 // The Tauri webview's origins (macOS and Windows/Linux) and its dev server.
 const ALLOWED_ORIGINS = new Set(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://localhost:1420"]);
@@ -96,6 +102,10 @@ export class Daemon {
   private recent: RecentMove[] = [];
   private lastRun: DaemonState["lastRun"] = null;
   private followUps: (FollowUp & { added?: boolean })[] = [];
+  /** The last search's hits by id, so Zee can open one without sending a path back. */
+  private found = new Map<string, string>();
+  private indexing: Promise<void> | null = null;
+  private indexAgain = false;
   private lastMessage = "Watching for new downloads.";
   /** Questions also out on the approver's phone, so an answer in Zee can call them off. */
   private remote = new Map<string, AbortController>();
@@ -147,6 +157,8 @@ export class Daemon {
     await this.options.waitForModel();
     this.dizzy = null;
     this.startWatcher();
+    // Read the folder for search in the background; new files are added after each run.
+    void this.firstPass.then(() => this.refreshIndex());
   }
 
   async stop(): Promise<void> {
@@ -197,7 +209,10 @@ export class Daemon {
       this.lastRun = { run: result.run.run, moved: result.run.moved };
       this.lastMessage = `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}.`;
     }
-    if (result.run?.moves.length) void this.options.voice?.say(spokenSummary(result.run.moves));
+    if (result.run?.moves.length) {
+      void this.options.voice?.say(spokenSummary(result.run.moves));
+      void this.refreshIndex();
+    }
     // Newest first, each offered once.
     for (const f of result.followUps ?? []) {
       if (!this.followUps.some((known) => known.file === f.file)) this.followUps.unshift(f);
@@ -220,6 +235,25 @@ export class Daemon {
       void this.options.voice?.say(spokenQuestion(batch ? Array(batch.count).fill(null) : reviews.map((item) => item.category)));
     }
     this.options.onEvent?.(result);
+  }
+
+  /** Brings the search index up to date, one pass at a time; errors only make search staler. */
+  private refreshIndex(): Promise<void> {
+    const search = this.options.search;
+    if (!search) return Promise.resolve();
+    if (this.indexing) {
+      this.indexAgain = true;
+      return this.indexing;
+    }
+    this.indexing = (async () => {
+      do {
+        this.indexAgain = false;
+        await updateIndex(this.options.folder, search).catch((error: unknown) => {
+          console.error(`Search index: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      } while (this.indexAgain);
+    })().finally(() => (this.indexing = null));
+    return this.indexing;
   }
 
   /** Answers a question, from Zee or from the phone. False if it was already answered. */
@@ -315,6 +349,23 @@ export class Daemon {
         this.followUps = this.followUps.filter((f) => f.file !== file);
         await recordDismissed(this.options.folder, file);
         return send(res, 200, this.state());
+      }
+      if (route === "POST /search") {
+        const { query } = SearchBody.parse(body);
+        if (!this.options.search) return send(res, 404, { error: "search is off" });
+        // Wait for a pass already under way, so a file that just arrived can be found.
+        await this.indexing;
+        const hits: SearchHit[] = await searchIndex(this.options.folder, query, this.options.search.embed, 5);
+        this.found = new Map(hits.map((hit) => [hitId(hit.path), hit.path]));
+        return send(res, 200, { hits: hits.map((hit) => ({ id: hitId(hit.path), path: hit.path, why: hit.why, score: hit.score })) });
+      }
+      if (route === "POST /reveal-found") {
+        const { id } = FoundBody.parse(body);
+        // Only a file from the last search, never an arbitrary path from the caller.
+        const path = this.found.get(id);
+        if (!path) return send(res, 404, { error: "not a search result" });
+        await new Promise<void>((ok, fail) => execFile("open", ["-R", join(this.options.folder, path)], (e) => (e ? fail(e) : ok())));
+        return send(res, 200, { ok: true });
       }
       if (route === "POST /undo") {
         const run = await lastUndoableRun(this.options.folder);

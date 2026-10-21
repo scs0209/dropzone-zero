@@ -11,7 +11,11 @@
       <div id="bubble-resize" title="Drag to resize the bubble" aria-hidden="true"></div>
       <div id="bubble-body">
         <p id="message">Connecting to Dropzone Zero...</p>
+        <form id="find" role="search">
+          <input id="find-query" type="search" placeholder="Find a file: describe it…" aria-label="Find a file by describing it" autocomplete="off" />
+        </form>
         <div id="lists">
+          <ul id="found" hidden></ul>
           <ul id="pending"></ul>
           <h2 id="coming-title" hidden>Coming up</h2>
           <ul id="coming"></ul>

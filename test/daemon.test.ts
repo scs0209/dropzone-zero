@@ -107,6 +107,7 @@ describe("dz daemon API", () => {
     assert.equal((await call("POST", "/calendar", { file: "../../etc/passwd" })).status, 404);
     assert.equal((await call("POST", "/dismiss", { file: "../../etc/passwd" })).status, 404);
     assert.equal((await call("POST", "/calendar/remove", { file: "../../etc/passwd" })).status, 404);
+    assert.equal((await call("POST", "/reveal-found", { id: "nope" })).status, 404, "only last search's hits can be opened");
     assert.deepEqual((await call("GET", "/state")).body.followUps, []);
   });
 

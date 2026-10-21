@@ -391,6 +391,43 @@ $("start").addEventListener("click", async () => {
   }
 });
 
+// Find a file by describing it ("photo of a receipt from a market"). The daemon
+// searches its local index; a hit opens in Finder. Nothing leaves the machine.
+$("find").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const query = $("find-query").value.trim();
+  const list = $("found");
+  if (!query) {
+    list.hidden = true;
+    return;
+  }
+  list.hidden = false;
+  list.replaceChildren(Object.assign(document.createElement("li"), { className: "searching", textContent: "Looking…" }));
+  try {
+    const { hits } = await call("POST", "/search", { query });
+    list.replaceChildren(
+      ...(hits.length
+        ? hits.map((hit) => {
+            const li = document.createElement("li");
+            const button = Object.assign(document.createElement("button"), { type: "button", title: "Show in Finder" });
+            button.append(
+              Object.assign(document.createElement("div"), { textContent: hit.path.split("/").pop() }),
+              Object.assign(document.createElement("div"), { className: "to", textContent: hit.why }),
+            );
+            button.onclick = () => call("POST", "/reveal-found", { id: hit.id }).catch(showError);
+            li.append(button);
+            return li;
+          })
+        : [Object.assign(document.createElement("li"), { className: "searching", textContent: "Nothing found." })]),
+    );
+  } catch (error) {
+    list.replaceChildren(Object.assign(document.createElement("li"), { className: "searching", textContent: String(error.message ?? error) }));
+  }
+});
+$("find-query").addEventListener("input", () => {
+  if (!$("find-query").value.trim()) $("found").hidden = true;
+});
+
 // Going away: the bubble closes, Zee dives into a hole in the ground, then the
 // window hides (or the app quits). Coming back, Zee pops out of the hole.
 async function diveAway() {

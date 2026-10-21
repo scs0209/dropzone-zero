@@ -224,6 +224,52 @@ ul {
   margin-top: 6px;
 }
 
+#find {
+  flex-shrink: 0;
+  margin: 0 0 6px;
+}
+#find-query {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  user-select: text;
+}
+#find-query:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+#found .searching {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 6px;
+}
+#found li button {
+  all: unset;
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+#found li button:hover,
+#found li button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+#found .to {
+  color: var(--muted);
+  font-size: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 #coming li {
   display: flex;
   align-items: center;

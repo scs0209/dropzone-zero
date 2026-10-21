@@ -27,6 +27,7 @@ import { batchNeedsApproval, DEFAULT_BULK_LIMIT, fingerprint, isRunnable } from 
 import { acquireWatchLock, WatcherRunningError } from "./lock.js";
 import { notify } from "./notify.js";
 import { RemoteApprover, remoteApprovalFromEnv } from "./remote-approval.js";
+import { ollamaEmbed } from "./search.js";
 import { Voice, voiceFromEnv } from "./voice.js";
 import { describeMoves, recentMoves } from "./recent.js";
 import { newRunId } from "./journal.js";
@@ -68,6 +69,9 @@ Usage:
   dz worker                      Run a Temporal worker that finishes interrupted runs
   dz receipts [folder] [--out file.csv]
                                  Export vendor, date, and total of receipts and invoices to CSV
+  dz index [folder]              Read every file for search (images are described by Gemma); local
+  dz find "<description>" [folder] [--reveal] [--limit N]
+                                 Find files by describing them, e.g. "receipt from the coffee shop"
 
 Options:
   --summary                      Print only counts and timings, no file names
@@ -573,6 +577,7 @@ async function daemon(folder: string): Promise<void> {
     model: client.model,
     remoteApprover: remote ? new RemoteApprover(remote) : null,
     voice: voiceConfig ? new Voice(voiceConfig) : null,
+    search: { client, embed: ollamaEmbed() },
     classify: async (file) => classifyFile(client, file, await extractContent(file)),
     waitForModel: () => waitForOllama(client),
     onEvent: (result) => {
@@ -705,6 +710,40 @@ async function undo(folder: string, yes: boolean, temporal: boolean, files: stri
   }
 }
 
+/** Brings the search index up to date; images are described by the local model. */
+async function indexFolder(folder: string): Promise<void> {
+  const { updateIndex, ollamaEmbed } = await import("./search.js");
+  const client = new OllamaClient();
+  await client.ensureReady();
+  const started = performance.now();
+  const { indexed, total } = await updateIndex(folder, {
+    client,
+    embed: ollamaEmbed(),
+    onProgress: (done, all) => {
+      if (process.stderr.isTTY) process.stderr.write(`\rReading ${done}/${all}...`);
+    },
+  });
+  if (process.stderr.isTTY) process.stderr.write("\r\x1b[K");
+  console.log(`Search index: ${total} files, ${indexed} read now (${((performance.now() - started) / 1000).toFixed(1)} s). Everything stayed on this machine.`);
+}
+
+/** Finds files by a description, indexing first if anything is new. */
+async function find(query: string, folder: string, json: boolean, reveal: boolean, limit: number): Promise<void> {
+  const { search, ollamaEmbed } = await import("./search.js");
+  await indexFolder(folder);
+  const hits = await search(folder, query, ollamaEmbed(), limit);
+  if (json) {
+    process.stdout.write(JSON.stringify(hits, null, 2) + "\n");
+    return;
+  }
+  if (hits.length === 0) return console.log("Nothing found.");
+  for (const [i, hit] of hits.entries()) {
+    console.log(`${String(i + 1).padStart(2)}. ${hit.path}  (${hit.score.toFixed(2)})`);
+    console.log(`    ${hit.why}`);
+  }
+  if (reveal) execFile("open", ["-R", join(folder, hits[0]!.path)]);
+}
+
 /** Finance/receipts-2026-10-20.csv, or -2, -3, ... so an export never overwrites an earlier one. */
 function defaultCsvPath(folder: string): string {
   const base = join(folder, "Finance", `receipts-${new Date().toISOString().slice(0, 10)}`);
@@ -810,6 +849,11 @@ async function main(): Promise<void> {
     return recent(folder, json, values.reveal ?? false, values.file?.[0], Number(values.limit ?? 20));
   }
   if (command === "tidy") return tidy(folder, values.yes ?? false);
+  if (command === "index") return indexFolder(folder);
+  if (command === "find") {
+    if (!positionals[1]) throw new Error('Describe what you are looking for: dz find "photo of a receipt from a market"');
+    return find(positionals[1], resolve(expandHome(positionals[2] ?? process.env.DZ_INBOX ?? "~/Downloads")), json, values.reveal ?? false, Number(values.limit ?? 5));
+  }
   if (command === "daemon") return daemon(folder);
   if (command === "watch") return watchFolder(folder, values.auto ?? false, values["include-existing"] ?? false);
   if (command === "approve") return approve(folder, values.file ?? [], values.all ?? false);
