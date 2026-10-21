@@ -190,5 +190,7 @@ No GPU beyond what Ollama uses on your Mac, and no internet after the one-time m
 
 ## 📄 License
 
-[MIT](LICENSE). Zee bundles [three.js](https://threejs.org) (MIT). The review gate uses the TabPFN v2 weights under
+[MIT](LICENSE). Zee bundles [three.js](https://threejs.org) (MIT).
+
+**Built with PriorLabs-TabPFN.** The review gate uses the TabPFN v2 weights under
 the [Prior Labs License](https://huggingface.co/Prior-Labs/TabPFN-v2-clf/blob/main/LICENSE.txt).

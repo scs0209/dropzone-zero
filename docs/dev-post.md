@@ -105,8 +105,6 @@ The unit tests (142 of them now) kept passing while most of these bugs were live
 - **Bills I still forgot.** Filing an invoice doesn't pay it, so invoices, bookings, and warranties now get a calendar event in `Calendar/Follow-ups` ("Pay: …" a day before the due date), read from the text next to "Due date" or "Pay by", since the date Gemma picks for an invoice is the day it was issued. Taking an event back out failed at first, `removed: 0`: Calendar gives an imported event a new UID. It keeps the notes, so events now carry a "Dropzone Zero ID" line there.
 - **Files I couldn't find.** Zee got a search box: describe a file ("photo of a receipt from a market") and Gemma's image descriptions plus [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) vectors find it. On my real folder it first answered everything with five results, and listed unrelated photos (0.31) for a photo I don't own. The demo's right answers had scored 0.39 and up, so a 0.35 floor fixed it.
 
-[agent_session 삽입: Undo 관련 버그 추적 세션 — Zee의 Undo가 동작하지 않는다는 보고 → 저널에 undo 기록이 없음을 확인 → `confirm()`이 macOS 웹뷰에서 false를 반환하는 원인 발견 → 되돌린 파일이 다시 정리되는 두 번째 버그 발견 → 수정 후 테스트와 녹화로 확인한 과정]
-
 ### Asking me on my phone, without opening a door to my Mac
 
 With [Auth0](https://auth0.com)'s Client-Initiated Backchannel Authentication (CIBA), the guard's questions also reach my phone as a Guardian push: **Allow** and the installer is filed, **Deny** and it stays. Whichever answer comes first, Zee or the phone, decides. The push says only "Dropzone Zero: move 1 installer", never a file name. The daemon only makes outgoing requests, and an approval releases exactly one held move through the same guard. Setting it up meant four clear errors (a missing notification channel, push off for the tenant, an unenrolled approver, and `access_denied` meaning both "declined" and "timed out"). Then a daemon watching a synthetic folder moved a held installer 13 seconds after I tapped **Allow**.
@@ -143,8 +141,6 @@ Tinker's own dashboard shows the same run: one training run on Qwen3.5-4B with L
 
 ![Document type and date accuracy for gemma4:e4b, untrained Qwen3.5-4B, and Qwen3.5-4B after LoRA, on the same 63 synthetic test files](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/model-compare.png)
 
-[agent_session 삽입: Tinker 파인튜닝 세션 — Qwen3.5-4B 기준선 샘플링 → LoRA 학습 로그(epoch별 loss 0.2397 → 0.0026 → 0.0005) → `dz eval --provider replay`로 채점한 결과까지의 실행 기록]
-
 ### Seeing what the agent does
 
 With a Sentry DSN set, every Gemma call is a `gen_ai.chat` span: model, token counts, whether an image went in, duration, and a cost of $0, because it is. Prompts, replies, file names, and paths are never sent.
@@ -166,7 +162,29 @@ Below is one preview of the 31 demo files: 25 model calls (rules decided the oth
 
 ## My Agent Session
 
-I built Dropzone Zero with Claude Code, and [Entire](https://entire.io) recorded the sessions as checkpoints while I worked. The two sessions marked above, the undo bug chase and the Tinker fine-tune, show what the code alone can't: how each problem was found.
+I built Dropzone Zero with Claude Code, and [Entire](https://entire.io) recorded the sessions and linked each one to its commit: 73 of the 92 commits carry an `Entire-Checkpoint:` trailer. The records are in a private repository because they also include local paths and account names.
+
+Two sessions are shared below, because they show what the code alone can't: how each problem was found. Both were long sessions, so I cut each one down to its episode. Tool outputs are removed, so you'll see my prompts, the agent's replies, and the commands it ran. My prompts were in Korean, so each one is shown in English first, then in Korean. I redacted local paths and account names.
+
+### 1. "What does the Undo last button do?", then "It didn't work, though?"
+
+Zee's **Undo last** did nothing when I clicked it. The agent started with the real journal and daemon log (counts only, paths redacted) and found no undo entries at all, so the click never reached the code that moves files. The only dialog in Zee's page was a `window.confirm()`, which the macOS WebView that Tauri uses never shows. It replaced it with a two-click button inside the bubble: "Put back?", then a second click within 4 seconds.
+
+Then it recorded the real UI against a real daemon to check. Undo ran, but the receipt was not back in the folder: the watcher had taken the put-back file for a new download and filed it again. The agent made the watcher remember what an undo put back, added a regression test, ran the whole suite, and recorded again to confirm the receipt stays put.
+
+Commit: [b22e1c1](https://github.com/scs0209/dropzone-zero/commit/b22e1c1) "make Zee's Undo last work, and keep undone files where they are"
+
+<!-- TODO: embed this session with the agent_session tag (file: undo-bug.jsonl) -->
+
+### 2. "Don't either of them have a free tier?", then "We use Gemma, so why fine-tune Qwen?"
+
+The agent checked Backboard and Tinker for a way to run a fine-tuned comparison. Both have free perks, but neither could pay for model calls on my account yet. Backboard's free credit was reserved for memory and RAG, and a test call to a paid Gemma model through it was refused. I put credit into Tinker and told it to go ahead, and I dropped Backboard.
+
+Tinker doesn't offer Gemma, so the agent had picked Qwen3.5-4B without telling me first. When I asked why we were tuning Qwen, it said so, and I made it a control experiment. It sampled the untrained Qwen on the 63 test cases (kind 100%, date 92.1%), trained the LoRA, and added a `replay` provider to `dz eval` so the replies were scored by the app's own pipeline. It also pointed out that models landing near 100% means my test set is too easy to tell them apart. That became the honest finding in the post.
+
+Commit: [5c886f0](https://github.com/scs0209/dropzone-zero/commit/5c886f0) "fine-tune a control model on Tinker; drop Backboard"
+
+<!-- TODO: embed this session with the agent_session tag (file: tinker-finetune.jsonl) -->
 
 ## The Lazy Payoff
 
@@ -188,3 +206,9 @@ Being lazy is safe here. If Gemma gets one wrong, undo is one click, and the fil
 - **Best Use of Entire**: Entire recorded the Claude Code sessions I built this with, as checkpoints pushed to a separate repo, so the undo bug chase and the Tinker run above can be traced back to the conversations that produced them.
 
 Tried but not entered: Backboard (its free credit covered memory and RAG but not model calls, so the comparison moved to Tinker) and ElevenLabs (a voice for Zee is coded but hasn't been run with a real key).
+
+## Credits
+
+The code is MIT licensed. Zee is drawn in code with [three.js](https://threejs.org) (MIT), and the test files, the receipt photo, and the app icon are generated by scripts in the repo, so there is no borrowed artwork or data. It runs on open models and tools: Gemma 4 and EmbeddingGemma from Google, Qwen3.5-4B from the Qwen team, [Ollama](https://ollama.com), and [Tauri](https://tauri.app).
+
+**Built with PriorLabs-TabPFN.** The review gate uses the TabPFN v2 weights under the [Prior Labs License](https://huggingface.co/Prior-Labs/TabPFN-v2-clf/blob/main/LICENSE.txt), which asks for this notice wherever the work is made available.
