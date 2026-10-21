@@ -7,11 +7,10 @@ cover_image: https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/m
 
 *This is a submission for the [Hacktoberfest Open-Source AI Challenge Week 3: Slow and Steady](https://dev.to/challenges/hacktoberfest-week3-2026-10-19)*
 
-A few seconds after Chrome finishes a download, the small robot in the corner of my screen eats it, and the file turns up in the right folder with a name I can search for. Gemma 4 does the reading, locally on my laptop. On 63 synthetic test documents, it got the document type right 98.4% of the time and the date right every time, at a median of 3.6 seconds per file. Nothing is ever deleted, and **Undo last** puts any file back exactly as it was.
+I never tidy my desktop or my folders, so files just pile up, and sorting them by hand is tedious and always takes longer than I expect. So I built Dropzone Zero: a local agent that files each download the moment it lands, by rules I set once. Gemma 4 reads every file on my laptop, a small robot named Zee shows what it's doing, and **Undo last** puts any file back exactly as it was. On 63 synthetic test documents, Gemma got the document type right 98.4% of the time and the date right every time, at a median of 3.6 seconds per file.
 
 **TL;DR**
 
-- **Why:** I never tidy my desktop or my folders, so files pile up, and cleaning up is tedious and takes longer than it looks. I wanted every download filed the moment it lands, by rules I set once.
 - **What:** Dropzone Zero reads each new download with `gemma4:e4b` in Ollama, decides what it is, names it, and files it. Risky moves wait for me, in a desktop robot called Zee or on my phone.
 - **Safety:** the model only proposes. A guard decides (allow, ask, or block), and a harness verifies and journals every move, so undo is exact.
 - **The Tinker result:** a LoRA on Qwen3.5-4B took date accuracy from 92.1% to 100% over its untrained baseline. Untuned local Gemma already scores 98.4% and 100%, so the app keeps Gemma.
@@ -19,9 +18,9 @@ A few seconds after Chrome finishes a download, the small robot in the corner of
 
 ## What I Built
 
-I don't tidy my desktop. I don't tidy my folders either. Files land and stay: receipts I'll need at tax time, a hotel confirmation for next month, three copies of the same PDF, an installer I already ran, `scan0001.pdf`, `export (1).csv`. Every so often I decide to clean up, and it's a bigger job than it looks: open each file, work out what it is, rename it, drag it somewhere sensible, and again for the next one. It's tedious, it takes far longer than it should, and it has no deadline, so I put it off. Then I can't find the invoice I need, or I forget to pay it.
+Here's what piles up: receipts I'll need at tax time, a hotel confirmation for next month, three copies of the same PDF, an installer I already ran, `scan0001.pdf`, `export (1).csv`. Cleaning up means opening each file, working out what it is, renaming it, dragging it somewhere sensible, and doing it all again for the next one. The job has no deadline, so I put it off, and then I can't find the invoice I need, or I forget to pay it.
 
-So I didn't want a better way to clean up. I wanted to never clean up: every download sorted the moment it arrives, by rules I decide once (where each kind of file goes, how it's named, what may move on its own and what has to ask me first). **Dropzone Zero** is that:
+So I didn't want a better way to clean up. I wanted to never clean up. The rules I set once say where each kind of file goes, how it's named, and what may move on its own versus what has to ask me first. In practice:
 
 ```
 scan0001.pdf  ->  Finance/Receipts/2026-10/2026-10-08-metro-cab-co-trip-receipt.pdf
