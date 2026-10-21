@@ -70,12 +70,14 @@ export interface WatchState {
   approvedBatches: Set<string>;
   /** Review items and batches already offered for a decision, so nobody is asked twice. */
   offered: Set<string>;
+  /** Files an undo put back that have since left the folder; if they come back, they are new downloads. */
+  goneSinceUndo: Set<string>;
   /** Set after a decision, so the next pass runs even if nothing on disk changed. */
   dirty: boolean;
 }
 
 export function newWatchState(): WatchState {
-  return { cache: new Map(), signature: "", baseline: null, approved: new Set(), approvedBatches: new Set(), offered: new Set(), dirty: false };
+  return { cache: new Map(), signature: "", baseline: null, approved: new Set(), approvedBatches: new Set(), offered: new Set(), goneSinceUndo: new Set(), dirty: false };
 }
 
 function batchKey(items: PlanItem[]): string {
@@ -94,20 +96,22 @@ async function carryOverApprovals(inbox: string, plan: PlanItem[]): Promise<void
 }
 
 /**
- * Files an undo put back, as name and hash. They are where the person wants them,
- * so --auto must not take them for new downloads and file them again (which made
- * Undo look like it did nothing). The hash pins the exact file: a new download
- * that reuses the name is still new.
+ * Files an undo put back, as name and hash, with when. They are where the person
+ * wants them, so --auto must not take them for new downloads and file them again
+ * (which made Undo look like it did nothing). The hash pins the exact file: a new
+ * download that reuses the name is still new, and so is the same file downloaded
+ * again after the put-back copy was deleted.
  */
-async function putBackByUndo(inbox: string): Promise<Set<string>> {
+async function putBackByUndo(inbox: string): Promise<Map<string, string>> {
   const entries = await readJournal(inbox);
   const hashes = new Map<string, string>();
   for (const e of entries) if (e.op === "move") hashes.set(`${e.run}\n${e.to}`, e.sha256);
-  const keys = new Set<string>();
+  // Name and hash -> when the latest undo put it back.
+  const keys = new Map<string, string>();
   for (const e of entries) {
     if (e.op !== "restore" || e.state !== "done") continue;
     const sha = hashes.get(`${e.run}\n${e.from}`);
-    if (sha) keys.add(`${e.to}\n${sha}`);
+    if (sha) keys.set(`${e.to}\n${sha}`, e.at);
   }
   return keys;
 }
@@ -128,10 +132,15 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
   // In --auto mode the files that were already here are left alone, so they are not
   // even sent to the model: a new download never waits behind a cluttered folder.
   const leaveExisting = options.auto && !options.includeExisting;
-  const putBack = leaveExisting ? await putBackByUndo(inbox) : new Set<string>();
+  const putBack = leaveExisting ? await putBackByUndo(inbox) : new Map<string, string>();
+  // A put-back file that left the folder (deleted, moved away) and comes back is a new download.
+  const present = new Set(scanned.map((f) => f.name));
+  for (const [key, at] of putBack) if (!present.has(key.split("\n")[0]!)) state.goneSinceUndo.add(`${key}\n${at}`);
   const isNewFile = (f: { name: string; sha256: string }) => {
     const key = `${f.name}\n${f.sha256}`;
-    return !state.baseline!.has(key) && !putBack.has(key);
+    const undoneAt = putBack.get(key);
+    const leftAlone = undoneAt !== undefined && !state.goneSinceUndo.has(`${key}\n${undoneAt}`);
+    return !state.baseline!.has(key) && !leftAlone;
   };
   const candidates = leaveExisting ? settled.filter(isNewFile) : settled;
   let newlyClassified = 0;

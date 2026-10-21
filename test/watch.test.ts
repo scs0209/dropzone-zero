@@ -144,6 +144,17 @@ describe("watchCycle", () => {
     assert.equal(after.run, undefined);
     assert.ok(existsSync(join(inbox, "new.pdf")), "and it stays put");
 
+    // Deleted and downloaded again, the same file is a new download.
+    const { rm } = await import("node:fs/promises");
+    await rm(join(inbox, "new.pdf"));
+    await watchCycle(state, options({ auto: true }));
+    await arrive("new.pdf");
+    const again = await watchCycle(state, options({ auto: true }));
+    assert.equal(again.run?.moved, 1);
+    await undoRun(inbox, (await lastUndoableRun(inbox))!);
+    await watchCycle(state, options({ auto: true }));
+    assert.ok(existsSync(join(inbox, "new.pdf")), "an undo after that is respected again");
+
     // A different file that reuses the name is a new download again.
     await arrive("new.pdf", "a different receipt");
     const next = await watchCycle(state, options({ auto: true }));
