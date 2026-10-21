@@ -113,8 +113,6 @@ Honestly, the unit tests (142 of them now) passed through most of this. Using th
 
 **Old files blocked new ones.** With more than 20 old files sitting in Downloads, `--auto` hit the bulk limit on every pass and moved nothing, not even the file I'd just downloaded. Now files that were already there are left alone (they're not even sent to the model), and new downloads go through.
 
-**Zee shook while I resized it.** Dragging the speech bubble's corner made the whole robot wobble, because the window was being resized on every move. Now the window stays put while you drag, and only the bubble changes size inside it.
-
 **Undo last did nothing.** I'd click it, and... nothing. The journal had no undo entries at all, which was the clue. The button asked "Are you sure?" with `window.confirm()`, and the macOS WebView that Tauri uses never shows that dialog. `confirm()` just quietly returned `false`. Now the button asks by itself: the first click turns it into "Put back?", the second click does it.
 
 **Then undo undid itself.** Fixed that, clicked Undo, the receipt went back to Downloads... and a few seconds later the watcher filed it again, because it looked like a new download. 😅 Now the watcher remembers what an undo put back. It also forgets once the file leaves, so a real re-download still gets filed. I only found that last part by trying it by hand.
@@ -135,7 +133,7 @@ Setting it up took a few tries. I hit four errors one after another: a missing n
 
 ![The Auth0 Guardian approval on my phone: "Dropzone Zero: move 1 installer", with Deny and Approve buttons; the account and tenant are covered](https://raw.githubusercontent.com/scs0209/dropzone-zero/main/docs/media/phone-approval.png)
 
-*The real push for a synthetic installer. My phone is in Korean: 거부 is Deny, 승인 is Approve. I covered my account and tenant. I wanted a GIF here, but Guardian blanks the screen while you're screen recording, so it's a screenshot.*
+*The real push for a synthetic installer. My phone is in Korean: 거부 is Deny, 승인 is Approve. I covered my account and tenant.*
 
 ### Gemma or a fine-tuned Qwen?
 
@@ -157,7 +155,7 @@ Fine-tuning fixed every date the base model missed (on bank statements, it kept 
 
 So... the app keeps Gemma, untuned. Reading one document and naming its kind and date is short, well-defined work. That's also why turning thinking off changed nothing. A tuned remote model would buy a point or two, and my files would have to leave my laptop. The real lesson was about my test set: when three models all land between 98% and 100%, it's too easy to tell them apart.
 
-I want to say something about Tinker, though, because it honestly surprised me. Fine-tuning always sounded like a whole project to me: rent GPUs, set up a training stack, babysit a run. Here the whole experiment is one 108-line Python script. Create a LoRA training client, call `forward_backward` and `optim_step` for each batch, save the weights, sample from the tuned model. I never touched a GPU. My first run did hit a 402 until I added credit to my account, but after that it just worked. Writing the evaluation took me longer than writing the training.
+I want to say something about Tinker, though, because it honestly surprised me. Fine-tuning always sounded like a whole project to me: rent GPUs, set up a training stack, babysit a run. Here the whole experiment is one 108-line Python script. Create a LoRA training client, call `forward_backward` and `optim_step` for each batch, save the weights, sample from the tuned model. I never touched a GPU. Writing the evaluation took me longer than writing the training.
 
 Here's the run, as my terminal printed it:
 
