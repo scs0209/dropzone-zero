@@ -8,6 +8,7 @@ import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { classifyFile } from "./classify.js";
+import { loadRules } from "./filing-rules.js";
 import type { CaseResult } from "./eval.js";
 import {
   approveItems,
@@ -205,7 +206,7 @@ async function preview(folder: string, format: "table" | "json" | "summary"): Pr
       inbox: folder,
       classify: async (file) => {
         const t0 = performance.now();
-        const result = await classifyFile(client, file, await extractContent(file));
+        const result = await classifyFile(client, file, await extractContent(file), undefined, loadRules(folder));
         recordDuration("dz.classify.duration", performance.now() - t0);
         return result;
       },
@@ -256,7 +257,7 @@ async function tidy(folder: string, yes: boolean): Promise<void> {
   const session = await startTidy({
     inbox: folder,
     model: client.model,
-    classify: async (file) => classifyFile(client, file, await extractContent(file)),
+    classify: async (file) => classifyFile(client, file, await extractContent(file), undefined, loadRules(folder)),
     onProgress: (done, total) => {
       if (process.stderr.isTTY) process.stderr.write(`\rPlanning ${done}/${total}...`);
     },
@@ -476,7 +477,7 @@ async function watchFolder(folder: string, auto: boolean, includeExisting: boole
     model: client.model,
     auto,
     includeExisting,
-    classify: async (file) => classifyFile(client, file, await extractContent(file)),
+    classify: async (file) => classifyFile(client, file, await extractContent(file), undefined, loadRules(folder)),
     onCycle: (result) => {
       recordCounts("dz.watch", { planned: result.planned, moved: result.run?.moved ?? 0 });
       printCycle(result);
@@ -579,7 +580,7 @@ async function daemon(folder: string): Promise<void> {
     voice: voiceConfig ? new Voice(voiceConfig) : null,
     // DZ_SEARCH=off: nothing is indexed or described for search.
     search: process.env.DZ_SEARCH === "off" ? null : { client, embed: ollamaEmbed() },
-    classify: async (file) => classifyFile(client, file, await extractContent(file)),
+    classify: async (file) => classifyFile(client, file, await extractContent(file), undefined, loadRules(folder)),
     waitForModel: () => waitForOllama(client),
     onEvent: (result) => {
       printCycle(result);

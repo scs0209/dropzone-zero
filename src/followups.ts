@@ -12,7 +12,8 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
-import { categoryOfTarget, isDateWritten, normalizeDate, type Category } from "./classify.js";
+import { isDateWritten, normalizeDate, type Category } from "./classify.js";
+import { categoryOfTarget, loadRules } from "./filing-rules.js";
 import { contentKindOf, extractContent } from "./extract.js";
 import { execFile } from "node:child_process";
 import { Journal, readJournal } from "./journal.js";
@@ -150,8 +151,9 @@ export async function writeFollowUps(
   run?: string,
 ): Promise<FollowUp[]> {
   const written: FollowUp[] = [];
+  const rules = loadRules(inbox);
   for (const move of moves) {
-    const category = items.find((item) => item.name === move.from)?.category ?? categoryOfTarget(move.to);
+    const category = items.find((item) => item.name === move.from)?.category ?? categoryOfTarget(move.to, rules);
     if (category !== "invoice" && category !== "booking" && category !== "warranty") continue;
     const path = join(inbox, move.to);
     const ext = extname(move.to).toLowerCase();

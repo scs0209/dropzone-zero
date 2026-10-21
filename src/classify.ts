@@ -1,6 +1,9 @@
 import { z } from "zod";
 import type { ExtractedContent } from "./extract.js";
+import { DEFAULT_RULES, resolveFolder, resolveTarget, type FilingRules } from "./filing-rules.js";
 import type { ScannedFile } from "./scan.js";
+
+export { categoryOfTarget } from "./filing-rules.js";
 
 export const CATEGORIES = [
   "receipt",
@@ -94,39 +97,6 @@ const CATEGORY_GUIDE: Record<Category, string> = {
   other: "app settings, data files, or anything you cannot identify",
 };
 
-const FOLDERS: Record<Category, { base: string; monthly: boolean }> = {
-  receipt: { base: "Finance/Receipts", monthly: true },
-  invoice: { base: "Finance/Invoices", monthly: true },
-  statement: { base: "Finance/Statements", monthly: true },
-  booking: { base: "Travel/Bookings", monthly: true },
-  photo: { base: "Photos", monthly: true },
-  screenshot: { base: "Screenshots", monthly: true },
-  manual: { base: "Home/Manuals", monthly: false },
-  warranty: { base: "Home/Warranties", monthly: false },
-  note: { base: "Notes", monthly: false },
-  calendar: { base: "Calendar", monthly: false },
-  installer: { base: "Installers", monthly: false },
-  temp: { base: "Temp", monthly: false },
-  document: { base: "Documents", monthly: false },
-  spreadsheet: { base: "Documents/Spreadsheets", monthly: false },
-  presentation: { base: "Documents/Presentations", monthly: false },
-  image: { base: "Images", monthly: false },
-  other: { base: "Other", monthly: false },
-};
-
-/** The category whose folder a filed path is in, e.g. Finance/Receipts/2026-10/x.pdf -> receipt. */
-export function categoryOfTarget(target: string): Category | null {
-  let best: Category | null = null;
-  let length = 0;
-  for (const [category, { base }] of Object.entries(FOLDERS) as [Category, { base: string }][]) {
-    if ((target === base || target.startsWith(`${base}/`)) && base.length > length) {
-      best = category;
-      length = base.length;
-    }
-  }
-  return best;
-}
-
 export function buildPrompt(file: ScannedFile, content: ExtractedContent): string {
   const body = content.text
     ? `Content${content.truncated ? " (truncated)" : ""}:\n"""\n${content.text}\n"""`
@@ -203,19 +173,18 @@ export function isDateWritten(date: string, evidence: string): boolean {
   return patterns.some((pattern) => new RegExp(`(?<!\\d)${pattern}(?!\\d)`, "i").test(evidence));
 }
 
-/** Builds the final name and folder from what the model read. */
+/** Builds the final name and folder from what the model read, by the folder's filing rules. */
 export function fileTarget(
   category: Category,
   date: string | null,
   title: string,
-  file: Pick<ScannedFile, "ext" | "modifiedAt">,
+  file: Pick<ScannedFile, "ext" | "modifiedAt"> & { name?: string },
+  rules: FilingRules = DEFAULT_RULES,
 ): { newName: string; folder: string } | null {
-  const datePrefix = date ? `${date}-` : "";
   const slug = slugify(title).replace(/^\d{4}-\d{2}-\d{2}-?/, "");
   if (!slug) return null;
-  const { base, monthly } = FOLDERS[category];
-  const month = (date ?? file.modifiedAt.toISOString()).slice(0, 7);
-  return { newName: `${datePrefix}${slug}${file.ext}`, folder: monthly ? `${base}/${month}` : base };
+  const original = file.name ? file.name.slice(0, file.name.length - file.ext.length) : "";
+  return resolveTarget(rules[category], { category, date, title: slug, original, modifiedAt: file.modifiedAt, ext: file.ext });
 }
 
 /**
@@ -227,9 +196,10 @@ export function fileTarget(
  */
 export function parseClassification(
   raw: string,
-  file: Pick<ScannedFile, "ext" | "modifiedAt">,
+  file: Pick<ScannedFile, "ext" | "modifiedAt"> & { name?: string },
   evidence: string,
   today = new Date(),
+  rules: FilingRules = DEFAULT_RULES,
 ): Classification | null {
   const reply = ClassificationReply.safeParse(readJsonReply(raw));
   if (!reply.success) return null;
@@ -238,7 +208,7 @@ export function parseClassification(
   const validDate = normalizeDate(date, today);
   const seen = `${evidence}\n${visibleText}`;
   const cleanDate = validDate && isDateWritten(validDate, seen) ? validDate : null;
-  const target = fileTarget(category, cleanDate, title, file);
+  const target = fileTarget(category, cleanDate, title, file, rules);
   if (!target) return null;
 
   return {
@@ -250,12 +220,12 @@ export function parseClassification(
   };
 }
 
-export function fallbackClassification(file: ScannedFile, attempts: number): ClassifyResult {
+export function fallbackClassification(file: ScannedFile, attempts: number, rules: FilingRules = DEFAULT_RULES): ClassifyResult {
   return {
     category: "other",
     date: null,
     newName: file.name,
-    folder: FOLDERS.other.base,
+    folder: resolveFolder(rules.other, null, file.modifiedAt),
     confidence: 0.1,
     reason: "The model did not return valid JSON; left for manual review.",
     source: "fallback",
@@ -269,6 +239,7 @@ export async function classifyFile(
   file: ScannedFile,
   content: ExtractedContent,
   today = new Date(),
+  rules: FilingRules = DEFAULT_RULES,
 ): Promise<ClassifyResult> {
   const prompt = buildPrompt(file, content);
   const evidence = `${file.name}\n${content.text}`;
@@ -281,10 +252,10 @@ export async function classifyFile(
       // Some images (CMYK JPEGs, mislabeled files) fail to decode. Classify those from
       // name and size instead; without an image, a failure means the model itself is down.
       if (!content.image) throw error;
-      return classifyFile(client, file, { ...content, image: undefined }, today);
+      return classifyFile(client, file, { ...content, image: undefined }, today, rules);
     }
-    const parsed = parseClassification(raw, file, evidence, today);
+    const parsed = parseClassification(raw, file, evidence, today, rules);
     if (parsed) return { ...parsed, source: "model", attempts: attempt };
   }
-  return fallbackClassification(file, maxAttempts);
+  return fallbackClassification(file, maxAttempts, rules);
 }

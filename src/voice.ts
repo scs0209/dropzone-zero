@@ -12,7 +12,8 @@ import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { categoryOfTarget, type Category } from "./classify.js";
+import type { Category } from "./classify.js";
+import { categoryOfTarget, DEFAULT_RULES, type FilingRules } from "./filing-rules.js";
 import { QUARANTINE_DIR } from "./plan.js";
 
 // "George", one of ElevenLabs' default voices; ELEVENLABS_VOICE_ID picks another.
@@ -31,11 +32,11 @@ function list(parts: string[]): string {
 }
 
 /** What Zee says after filing: kinds and counts only. */
-export function spokenSummary(moves: { to: string }[]): string {
+export function spokenSummary(moves: { to: string }[], rules: FilingRules = DEFAULT_RULES): string {
   if (moves.length === 0) return "";
   const kinds = new Map<string, number>();
   for (const move of moves) {
-    const kind = move.to.startsWith(`${QUARANTINE_DIR}/`) ? "duplicate or temp file" : noun(categoryOfTarget(move.to));
+    const kind = move.to.startsWith(`${QUARANTINE_DIR}/`) ? "duplicate or temp file" : noun(categoryOfTarget(move.to, rules));
     kinds.set(kind, (kinds.get(kind) ?? 0) + 1);
   }
   const what = list([...kinds].sort((a, b) => b[1] - a[1]).map(([kind, n]) => count(n, kind)));

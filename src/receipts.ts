@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { z } from "zod";
 import { isDateWritten, normalizeDate, readJsonReply, type ModelClient } from "./classify.js";
 import { loadPlan } from "./execute.js";
+import { categoryOfTarget, fixedPrefix, loadRules } from "./filing-rules.js";
 import type { ExtractedContent } from "./extract.js";
 import { loadIgnore } from "./ignore.js";
 import { scanFolder, type ScannedFile } from "./scan.js";
@@ -14,11 +15,6 @@ import { scanFolder, type ScannedFile } from "./scan.js";
 // model cannot point to is left blank and the row is marked for checking.
 
 export type ReceiptKind = "receipt" | "invoice";
-
-export const RECEIPT_FOLDERS: Record<ReceiptKind, string> = {
-  receipt: "Finance/Receipts",
-  invoice: "Finance/Invoices",
-};
 
 export interface ReceiptFile {
   file: ScannedFile;
@@ -59,13 +55,16 @@ async function walk(dir: string): Promise<string[]> {
 }
 
 /**
- * Receipts and invoices in the inbox: files already filed under Finance/ by `dz run`,
+ * Receipts and invoices in the inbox: files already filed into their folders by `dz run`
+ * (Finance/Receipts and Finance/Invoices, unless .dropzonerules.json says otherwise),
  * plus files the saved plan says are receipts or invoices but has not moved yet.
  */
 export async function findReceiptFiles(inbox: string): Promise<ReceiptFile[]> {
   const found = new Map<string, ReceiptFile>();
+  const rules = loadRules(inbox);
   for (const kind of ["receipt", "invoice"] as const) {
-    for (const dir of await walk(join(inbox, RECEIPT_FOLDERS[kind]))) {
+    for (const dir of await walk(join(inbox, fixedPrefix(rules[kind])))) {
+      if (categoryOfTarget(`${relative(inbox, dir)}/`, rules) !== kind) continue;
       for (const file of await scanFolder(dir)) if (!file.duplicateOf) found.set(file.sha256, { file, kind });
     }
   }

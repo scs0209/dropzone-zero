@@ -11,6 +11,7 @@ import { fingerprint } from "./guard.js";
 import { recentMoves, type RecentMove } from "./recent.js";
 import { addedToCalendar, pendingFollowUps, recordCalendarAdd, recordDismissed, removeFromCalendar, takeBackFromCalendar, type FollowUp, type RemoveEvents } from "./followups.js";
 import type { ModelClient } from "./classify.js";
+import { loadRules } from "./filing-rules.js";
 import type { RemoteApprover } from "./remote-approval.js";
 import { hitId, search as searchIndex, updateIndex, type Embed, type SearchHit } from "./search.js";
 import { spokenQuestion, spokenSummary, type Voice } from "./voice.js";
@@ -210,7 +211,7 @@ export class Daemon {
       this.lastMessage = `Filed ${result.run.moved} new ${result.run.moved === 1 ? "download" : "downloads"}.`;
     }
     if (result.run?.moves.length) {
-      void this.options.voice?.say(spokenSummary(result.run.moves));
+      void this.options.voice?.say(spokenSummary(result.run.moves, loadRules(this.options.folder)));
       void this.refreshIndex();
     }
     // Newest first, each offered once.

@@ -57,6 +57,8 @@ export function judge(item: PlanItem): Judgement {
   if (!staysInside(item.name) || item.name.includes("/") || item.name.includes("\\")) return block("Source is not a file in this folder");
   if (!staysInside(item.target)) return block("Target leaves the folder");
   if (extname(item.target).toLowerCase() !== extname(item.name).toLowerCase()) return block("Would change the file type");
+  // Quarantine lives in .dropzone; a move (by the model or a filing rule) never goes into a hidden folder.
+  if (item.action === "move" && normalize(item.target).split(sep).some((part) => part.startsWith("."))) return block("Target is in a hidden folder");
 
   const checks = [...(item.checks ?? [])];
   if (item.action === "move") {

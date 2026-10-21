@@ -200,6 +200,24 @@ Scans/*.pdf    # a path from the top of the folder
 
 `DZ_SEARCH=off` turns search off altogether: nothing is read or described for it.
 
+## Choose where files go and how they are named
+
+The built-in layout (`Finance/Receipts/2026-10/2026-10-14-bluebird-coffee-receipt.pdf` and so on) is a default. To change it, put a `.dropzonerules.json` file in the folder and list only the kinds you want to change:
+
+```json
+{
+  "receipt":    { "folder": "Money/Receipts/{year}", "name": "{title}-{date}" },
+  "screenshot": { "folder": "Screens/{year}-{month}" },
+  "photo":      { "name": "{date}-{original}" }
+}
+```
+
+- **Kinds:** `receipt`, `invoice`, `statement`, `booking`, `photo`, `screenshot`, `image`, `manual`, `warranty`, `note`, `document`, `spreadsheet`, `presentation`, `calendar`, `installer`, `other`. Temp files always go to quarantine.
+- **`folder`:** a path inside the folder. `{year}` and `{month}` come from the date printed in the document, or from the file's own date when none is printed.
+- **`name`:** `{date}` (the printed date, or nothing), `{title}` (what the model read, as a slug), `{category}`, and `{original}` (the name the file arrived with). It must contain `{title}` or `{original}`. The extension is always kept, and a dash left by an empty `{date}` is dropped.
+
+A rule only chooses a path; it does not get past the guard. A rule that points outside the folder, into a hidden folder (including `.dropzone`), or uses `..` is refused when the file is read, and the run stops with a message naming the kind and setting, rather than quietly filing by the defaults. Every move it produces is still judged like any other: an installer still waits for review, a low-confidence guess still waits, and a type change is still blocked. The file is read again on every pass, so an edit applies to the next download without a restart. Calendar follow-ups, receipts to CSV, and Zee's spoken summaries find files by the same rules.
+
 ## How a run stays safe
 
 - `dz run` executes exactly the plan you previewed. The model is not asked again, so what you saw is what happens.
@@ -295,7 +313,7 @@ In testing, a run killed after 15 of 30 files was finished by `dz worker` with 3
 
 1. **Rules first.** Partial downloads are skipped. Empty files, duplicates (same SHA-256 as an older copy), and temp files are planned for quarantine. These cases never reach the model.
 2. **Read the file.** Text is pulled from PDFs with [unpdf](https://github.com/unjs/unpdf) (a serverless build of Mozilla's PDF.js, so compressed real-world PDFs work too) from Office files (`.docx`, `.xlsx`, `.pptx`, through a small built-in ZIP reader), and from text formats such as `.txt`, `.md`, `.csv`, `.json`, and `.ics`, capped at 2,000 characters. Images (`.png`, `.jpg`, `.webp`, up to 20 MB) go to Gemma's vision input, so a phone photo named `IMG_2041.jpg` can come out as `Finance/Receipts/2026-10/2026-10-11-juniper-market-receipt.jpg`. Installers and other binaries are described by name and size only.
-3. **The model reads; code files.** Gemma returns strict JSON: a category, the date written in the document, a short title, a confidence, and a reason. The folder and final name are built in code from that answer (for example `Finance/Receipts/2026-10/2026-10-14-bluebird-coffee-receipt.pdf`). A date the model reports is kept only if it actually appears in the file (as 2026-10-14, 10/14/2026, Oct 14, 2026, 2026년 10월 14일, and other common forms), because small models fill gaps with plausible dates. For images, the model also transcribes the text it reads, and the date has to appear in that transcription.
+3. **The model reads; code files.** Gemma returns strict JSON: a category, the date written in the document, a short title, a confidence, and a reason. The folder and final name are built in code from that answer (for example `Finance/Receipts/2026-10/2026-10-14-bluebird-coffee-receipt.pdf`), by the default layout or your `.dropzonerules.json`. A date the model reports is kept only if it actually appears in the file (as 2026-10-14, 10/14/2026, Oct 14, 2026, 2026년 10월 14일, and other common forms), because small models fill gaps with plausible dates. For images, the model also transcribes the text it reads, and the date has to appear in that transcription.
    Categories cover what a real Downloads folder holds, not just paperwork: receipts, invoices, statements, bookings, photos, screenshots, images, manuals, warranties, notes, documents, spreadsheets, presentations, calendar invites, installers, and temp files. An early version without the generic document, spreadsheet, presentation, and image categories sent 75% of a real folder to "other"; with them, it is 15%.
 4. **Doubt means stay put.** Invalid JSON gets one retry, then the file falls back to `other` and is skipped. Anything under 0.5 confidence is also skipped and shown for review.
 
@@ -335,6 +353,7 @@ Off by default. With `SENTRY_DSN` set, Dropzone Zero sends counts (files, moves,
 - [x] Guardrail engine with ALLOW / REVIEW / BLOCK verdicts, checked again by the executor
 - [x] `dz watch` with `--auto` for allowed moves only
 - [x] Gemma vision for photos and screenshots (Ollama's `images` field)
+- [x] Your own folder and name rules (`.dropzonerules.json`), checked by the same guard
 - [ ] Vision for scanned PDFs that have no text layer (render the first page to an image)
 - [x] `dz tidy` as a Mastra workflow with a suspend/resume approval step
 
