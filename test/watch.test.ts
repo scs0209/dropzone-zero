@@ -161,6 +161,18 @@ describe("watchCycle", () => {
     assert.equal(next.run?.moved, 1);
   });
 
+  it("files a download that was already there if it is deleted and downloaded again", async () => {
+    await arrive("old.pdf");
+    const state = newWatchState();
+    assert.equal((await watchCycle(state, options({ auto: true }))).existing, 1);
+    const { rm } = await import("node:fs/promises");
+    await rm(join(inbox, "old.pdf"));
+    await watchCycle(state, options({ auto: true }));
+    await arrive("old.pdf");
+    const again = await watchCycle(state, options({ auto: true }));
+    assert.equal(again.run?.moved, 1);
+  });
+
   it("a cluttered folder no longer holds up a new download", async () => {
     process.env.DZ_BULK_LIMIT = "2";
     try {

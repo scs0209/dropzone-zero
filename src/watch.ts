@@ -133,8 +133,10 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
   // even sent to the model: a new download never waits behind a cluttered folder.
   const leaveExisting = options.auto && !options.includeExisting;
   const putBack = leaveExisting ? await putBackByUndo(inbox) : new Map<string, string>();
-  // A put-back file that left the folder (deleted, moved away) and comes back is a new download.
+  // A file that leaves the folder (deleted, moved away) and comes back is a new download:
+  // it no longer counts as one that was already here, nor as one an undo put back.
   const present = new Set(scanned.map((f) => f.name));
+  for (const key of state.baseline) if (!present.has(key.split("\n")[0]!)) state.baseline.delete(key);
   for (const [key, at] of putBack) if (!present.has(key.split("\n")[0]!)) state.goneSinceUndo.add(`${key}\n${at}`);
   const isNewFile = (f: { name: string; sha256: string }) => {
     const key = `${f.name}\n${f.sha256}`;
