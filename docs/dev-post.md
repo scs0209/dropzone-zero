@@ -195,7 +195,7 @@ Clicking **Undo last** did nothing. Instead of guessing, the agent read the real
 
 Commit: [b22e1c1](https://github.com/scs0209/dropzone-zero/commit/b22e1c1) "make Zee's Undo last work, and keep undone files where they are"
 
-<!-- TODO: embed this session with the agent_session tag (file: undo-bug.jsonl) -->
+{% agent_session 1084 %}
 
 ### 2. "Don't either of them have a free tier?", then "We use Gemma, so why fine-tune Qwen?"
 
@@ -203,7 +203,7 @@ It started with money: the agent checked whether Backboard or Tinker could pay f
 
 Commit: [5c886f0](https://github.com/scs0209/dropzone-zero/commit/5c886f0) "fine-tune a control model on Tinker; drop Backboard"
 
-<!-- TODO: embed this session with the agent_session tag (file: tinker-finetune.jsonl) -->
+{% agent_session 1085 %}
 
 ## The Lazy Payoff
 
