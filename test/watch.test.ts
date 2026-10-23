@@ -155,10 +155,37 @@ describe("watchCycle", () => {
     await watchCycle(state, options({ auto: true }));
     assert.ok(existsSync(join(inbox, "new.pdf")), "an undo after that is respected again");
 
-    // A different file that reuses the name is a new download again.
-    await arrive("new.pdf", "a different receipt");
-    const next = await watchCycle(state, options({ auto: true }));
-    assert.equal(next.run?.moved, 1);
+    // Edited in place, it is still the file the person put back.
+    await arrive("new.pdf", "the same receipt, with a note added");
+    const edited = await watchCycle(state, options({ auto: true }));
+    assert.equal(edited.run, undefined);
+    assert.ok(existsSync(join(inbox, "new.pdf")), "an edit does not undo the undo");
+  });
+
+  it("leaves a file an undo put back alone after a restart", async () => {
+    const before = newWatchState();
+    await watchCycle(before, options({ auto: true }));
+    await arrive("new.pdf");
+    assert.equal((await watchCycle(before, options({ auto: true }))).run?.moved, 1);
+    await undoRun(inbox, (await lastUndoableRun(inbox))!);
+
+    // A new watcher, as after quitting Zee or a reboot, starts from the journal.
+    const after = newWatchState();
+    await watchCycle(after, options({ auto: true }));
+    await arrive("new.pdf", "the same receipt, with a note added");
+    const edited = await watchCycle(after, options({ auto: true }));
+    assert.equal(edited.run, undefined);
+    assert.ok(existsSync(join(inbox, "new.pdf")), "still where the undo put it");
+  });
+
+  it("leaves a file that was already there alone when it is edited", async () => {
+    await arrive("export.csv", "a,b");
+    const state = newWatchState();
+    assert.equal((await watchCycle(state, options({ auto: true }))).existing, 1);
+    await arrive("export.csv", "a,b,c");
+    const edited = await watchCycle(state, options({ auto: true }));
+    assert.equal(edited.run, undefined);
+    assert.ok(existsSync(join(inbox, "export.csv")), "a file being worked on is not moved");
   });
 
   it("files a download that was already there if it is deleted and downloaded again", async () => {

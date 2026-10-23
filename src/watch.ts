@@ -62,7 +62,7 @@ export interface WatchState {
   cache: Map<string, ClassifyResult>;
   /** Names, sizes, and times of the settled files the last cycle saw. */
   signature: string;
-  /** Files (name and hash) present when watching started; null until the first cycle. */
+  /** Names of the files present when watching started; null until the first cycle. */
   baseline: Set<string> | null;
   /** Fingerprints of review items a person approved while watching. */
   approved: Set<string>;
@@ -96,31 +96,24 @@ async function carryOverApprovals(inbox: string, plan: PlanItem[]): Promise<void
 }
 
 /**
- * Files an undo put back, as name and hash, with when. They are where the person
- * wants them, so --auto must not take them for new downloads and file them again
- * (which made Undo look like it did nothing). The hash pins the exact file: a new
- * download that reuses the name is still new, and so is the same file downloaded
- * again after the put-back copy was deleted.
+ * Files an undo put back, by name, with when. They are where the person wants them,
+ * so --auto must not take them for new downloads and file them again (which made
+ * Undo look like it did nothing). Read from the journal, so this holds across
+ * restarts. Files are known by name, not content: editing a file in place keeps it
+ * the same file, while one that leaves the folder and comes back is a new download.
  */
 async function putBackByUndo(inbox: string): Promise<Map<string, string>> {
-  const entries = await readJournal(inbox);
-  const hashes = new Map<string, string>();
-  for (const e of entries) if (e.op === "move") hashes.set(`${e.run}\n${e.to}`, e.sha256);
-  // Name and hash -> when the latest undo put it back.
-  const keys = new Map<string, string>();
-  for (const e of entries) {
-    if (e.op !== "restore" || e.state !== "done") continue;
-    const sha = hashes.get(`${e.run}\n${e.from}`);
-    if (sha) keys.set(`${e.to}\n${sha}`, e.at);
-  }
-  return keys;
+  // Name -> when the latest undo put it back.
+  const names = new Map<string, string>();
+  for (const e of await readJournal(inbox)) if (e.op === "restore" && e.state === "done") names.set(e.to, e.at);
+  return names;
 }
 
 /** One pass: scan, plan what has settled, save the plan, and with --auto run what the guard allows. */
 export async function watchCycle(state: WatchState, options: WatchOptions): Promise<CycleResult> {
   const { inbox, settleMs = DEFAULT_SETTLE_MS, now = Date.now } = options;
   const scanned = await scanFolder(inbox);
-  state.baseline ??= new Set(scanned.map((f) => `${f.name}\n${f.sha256}`));
+  state.baseline ??= new Set(scanned.map((f) => f.name));
   const settled = scanned.filter((f) => now() - f.modifiedAt.getTime() >= settleMs);
   // Which files have settled is part of the signature: a file that finished writing is news.
   const signature = settled.map((f) => `${f.name}\n${f.size}\n${f.modifiedAt.getTime()}`).join("\n") + `\n#${scanned.length}`;
@@ -136,13 +129,12 @@ export async function watchCycle(state: WatchState, options: WatchOptions): Prom
   // A file that leaves the folder (deleted, moved away) and comes back is a new download:
   // it no longer counts as one that was already here, nor as one an undo put back.
   const present = new Set(scanned.map((f) => f.name));
-  for (const key of state.baseline) if (!present.has(key.split("\n")[0]!)) state.baseline.delete(key);
-  for (const [key, at] of putBack) if (!present.has(key.split("\n")[0]!)) state.goneSinceUndo.add(`${key}\n${at}`);
-  const isNewFile = (f: { name: string; sha256: string }) => {
-    const key = `${f.name}\n${f.sha256}`;
-    const undoneAt = putBack.get(key);
-    const leftAlone = undoneAt !== undefined && !state.goneSinceUndo.has(`${key}\n${undoneAt}`);
-    return !state.baseline!.has(key) && !leftAlone;
+  for (const name of state.baseline) if (!present.has(name)) state.baseline.delete(name);
+  for (const [name, at] of putBack) if (!present.has(name)) state.goneSinceUndo.add(`${name}\n${at}`);
+  const isNewFile = (f: { name: string }) => {
+    const undoneAt = putBack.get(f.name);
+    const leftAlone = undoneAt !== undefined && !state.goneSinceUndo.has(`${f.name}\n${undoneAt}`);
+    return !state.baseline!.has(f.name) && !leftAlone;
   };
   const candidates = leaveExisting ? settled.filter(isNewFile) : settled;
   let newlyClassified = 0;

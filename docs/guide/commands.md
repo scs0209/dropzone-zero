@@ -56,7 +56,7 @@ pnpm dz watch ~/Downloads --auto
 
 That run is a Chrome-style download (a `.crdownload` file renamed when finished) of a photographed receipt landing in a folder that already held 30 files: eleven seconds after the download completed, it was in `Finance/Receipts/2026-10/2026-10-11-juniper-market-purchase-receipt.jpg`.
 
-With `--auto`, only files that arrive after watching starts are moved. Files that were already in the folder are not even sent to the model, so a cluttered Downloads folder never makes a new download wait; sort the backlog with `dz tidy` whenever you like, or pass `--include-existing` to let watch handle it too.
+With `--auto`, only files that arrive after watching starts are moved. Files are known by name, so a file you edit in place (an export you are working on, a receipt that undo put back) stays the same file and is never filed because you saved it; one that leaves the folder and comes back is a new download. Files that were already in the folder are not even sent to the model, so a cluttered Downloads folder never makes a new download wait; sort the backlog with `dz tidy` whenever you like, or pass `--include-existing` to let watch handle it too.
 
 Watch mode does not loosen anything. Without `--auto` it only plans. With it, only `ALLOW` items move on their own; `BLOCK` items never move; and anything that needs a person, a `REVIEW` item or a batch of new files larger than the bulk limit, is asked about right in the watch terminal, once:
 
